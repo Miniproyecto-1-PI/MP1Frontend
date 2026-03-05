@@ -3,7 +3,11 @@ import PageHeader from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-const API_URL = "http://127.0.0.1:8000/api";
+const API_URL =
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1"
+    ? "http://127.0.0.1:8000/api"
+    : "https://mp1backend.onrender.com/api";
 
 export default function HoyPage() {
   const [actividades, setActividades] = useState([]);
@@ -44,11 +48,7 @@ export default function HoyPage() {
   if (loading) {
     return (
       <div>
-        <PageHeader
-          title="Hoy"
-          description={obtenerFechaActual()}
-          icon="📅"
-        />
+        <PageHeader title="Hoy" description={obtenerFechaActual()} icon="📅" />
         <div className="mt-6 text-center text-muted-foreground">
           Cargando actividades...
         </div>
@@ -58,11 +58,7 @@ export default function HoyPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Hoy"
-        description={obtenerFechaActual()}
-        icon="📅"
-      />
+      <PageHeader title="Hoy" description={obtenerFechaActual()} icon="📅" />
 
       <div className="mt-6">
         {error && (
@@ -92,13 +88,19 @@ export default function HoyPage() {
         {actividades.length > 0 && (
           <div className="space-y-4">
             <p className="text-muted-foreground mb-4">
-              {actividades.length} actividad{actividades.length !== 1 ? "es" : ""} para hoy
+              {actividades.length} actividad
+              {actividades.length !== 1 ? "es" : ""} para hoy
             </p>
             {actividades.map((actividad) => (
-              <Card key={actividad.id} className="hover:shadow-md transition-shadow">
+              <Card
+                key={actividad.id}
+                className="hover:shadow-md transition-shadow"
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{actividad.titulo}</CardTitle>
+                    <CardTitle className="text-lg">
+                      {actividad.titulo}
+                    </CardTitle>
                     <Button variant="outline" size="sm" asChild>
                       <a href={`/actividad/${actividad.id}`}>Ver</a>
                     </Button>
@@ -114,7 +116,8 @@ export default function HoyPage() {
                 {actividad.subtareas && actividad.subtareas.length > 0 && (
                   <CardContent className="pt-0">
                     <p className="text-xs text-muted-foreground mb-2">
-                      Subtareas ({actividad.subtareas.filter((s) => s.completada).length}/
+                      Subtareas (
+                      {actividad.subtareas.filter((s) => s.completada).length}/
                       {actividad.subtareas.length})
                     </p>
                     <div className="space-y-1">

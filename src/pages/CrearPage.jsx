@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 
-const API_URL = "http://127.0.0.1:8000/api";
+const API_URL =
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1"
+    ? "http://127.0.0.1:8000/api"
+    : "https://mp1backend.onrender.com/api";
 
 const initialErrors = {
   titulo: "",
@@ -37,7 +41,8 @@ export default function CrearPage() {
     }
 
     if (descripcion.length > 500) {
-      nuevosErrores.descripcion = "La descripción no puede exceder 500 caracteres";
+      nuevosErrores.descripcion =
+        "La descripción no puede exceder 500 caracteres";
       esValido = false;
     }
 
@@ -50,11 +55,12 @@ export default function CrearPage() {
       .map((s) => s.titulo.trim())
       .filter((t) => t !== "");
     const duplicados = titulosSubtareas.filter(
-      (t, i) => titulosSubtareas.indexOf(t) !== i
+      (t, i) => titulosSubtareas.indexOf(t) !== i,
     );
 
     if (duplicados.length > 0) {
-      nuevosErrores.subtareas = "No puede haber subtareas con títulos duplicados";
+      nuevosErrores.subtareas =
+        "No puede haber subtareas con títulos duplicados";
       esValido = false;
     }
 
@@ -124,7 +130,8 @@ export default function CrearPage() {
         if (data.fecha_entrega) erroresBackend.push(data.fecha_entrega);
         if (data.subtareas) {
           data.subtareas.forEach((err, i) => {
-            if (err.titulo) erroresBackend.push(`Subtarea ${i + 1}: ${err.titulo}`);
+            if (err.titulo)
+              erroresBackend.push(`Subtarea ${i + 1}: ${err.titulo}`);
           });
         }
         throw new Error(erroresBackend.join(" | ") || "Error de validación");
@@ -203,10 +210,14 @@ export default function CrearPage() {
                     setDescripcion(e.target.value);
                     setErrors({ ...errors, descripcion: "" });
                   }}
-                  className={errors.descripcion ? "border-red-500 mt-1" : "mt-1"}
+                  className={
+                    errors.descripcion ? "border-red-500 mt-1" : "mt-1"
+                  }
                 />
                 {errors.descripcion && (
-                  <p className="text-red-500 text-sm mt-1">{errors.descripcion}</p>
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.descripcion}
+                  </p>
                 )}
                 <p className="text-muted-foreground text-xs mt-1">
                   {descripcion.length}/500 caracteres
@@ -223,10 +234,14 @@ export default function CrearPage() {
                     setFechaEntrega(e.target.value);
                     setErrors({ ...errors, fecha_entrega: "" });
                   }}
-                  className={errors.fecha_entrega ? "border-red-500 mt-1" : "mt-1"}
+                  className={
+                    errors.fecha_entrega ? "border-red-500 mt-1" : "mt-1"
+                  }
                 />
                 {errors.fecha_entrega && (
-                  <p className="text-red-500 text-sm mt-1">{errors.fecha_entrega}</p>
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.fecha_entrega}
+                  </p>
                 )}
               </div>
             </CardContent>
