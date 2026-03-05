@@ -1,6 +1,76 @@
+import { useState } from "react";
 import PageHeader from "@/components/layout/PageHeader";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+
+const API_URL = "http://127.0.0.1:8000/api";
 
 export default function CrearPage() {
+  const [titulo, setTitulo] = useState("");
+  const [descripcion, setDescripcion] = useState("");
+  const [fechaEntrega, setFechaEntrega] = useState("");
+  const [subtareas, setSubtareas] = useState([{ titulo: "" }]);
+  const [loading, setLoading] = useState(false);
+  const [mensaje, setMensaje] = useState(null);
+  const [error, setError] = useState(null);
+
+  const agregarSubtarea = () => {
+    setSubtareas([...subtareas, { titulo: "" }]);
+  };
+
+  const eliminarSubtarea = (index) => {
+    setSubtareas(subtareas.filter((_, i) => i !== index));
+  };
+
+  const actualizarSubtarea = (index, valor) => {
+    const nuevasSubtareas = [...subtareas];
+    nuevasSubtareas[index].titulo = valor;
+    setSubtareas(nuevasSubtareas);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMensaje(null);
+    setError(null);
+
+    try {
+      const payload = {
+        titulo,
+        descripcion,
+        fecha_entrega: fechaEntrega,
+        subtareas: subtareas.filter((s) => s.titulo.trim() !== ""),
+      };
+
+      const response = await fetch(`${API_URL}/actividades/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(JSON.stringify(errorData));
+      }
+
+      const data = await response.json();
+      setMensaje(`Actividad "${data.titulo}" creada con ${data.subtareas.length} subtareas`);
+      
+      setTitulo("");
+      setDescripcion("");
+      setFechaEntrega("");
+      setSubtareas([{ titulo: "" }]);
+    } catch (err) {
+      setError(err.message || "Error al crear la actividad");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div>
       <PageHeader
@@ -8,11 +78,100 @@ export default function CrearPage() {
         description="Crea una nueva actividad evaluativa con su plan de trabajo"
         icon="➕"
       />
-      <div className="mt-6">
-        <p className="text-muted-foreground">
-          Aquí se podrá crear una actividad evaluativa e ingresar su plan
-          inicial de trabajo (subtareas / hitos).
-        </p>
+      
+      <div className="mt-6 max-w-2xl">
+        {mensaje && (
+          <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
+            {mensaje}
+          </div>
+        )}
+        
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Datos de la actividad</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="titulo">Título de la actividad</Label>
+                <Input
+                  id="titulo"
+                  type="text"
+                  placeholder="Ej: Proyecto Final"
+                  value={titulo}
+                  onChange={(e) => setTitulo(e.target.value)}
+                  required
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="descripcion">Descripción</Label>
+                <Input
+                  id="descripcion"
+                  type="text"
+                  placeholder="Descripción de la actividad"
+                  value={descripcion}
+                  onChange={(e) => setDescripcion(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="fechaEntrega">Fecha de entrega</Label>
+                <Input
+                  id="fechaEntrega"
+                  type="date"
+                  value={fechaEntrega}
+                  onChange={(e) => setFechaEntrega(e.target.value)}
+                  required
+                  className="mt-1"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="mt-4">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Subtareas / Hitos</CardTitle>
+              <Button type="button" variant="outline" onClick={agregarSubtarea}>
+                + Agregar
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {subtareas.map((subtarea, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input
+                    type="text"
+                    placeholder={`Subtarea ${index + 1}`}
+                    value={subtarea.titulo}
+                    onChange={(e) => actualizarSubtarea(index, e.target.value)}
+                    className="flex-1"
+                  />
+                  {subtareas.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={() => eliminarSubtarea(index)}
+                    >
+                      ✕
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Button type="submit" className="mt-4 w-full" disabled={loading}>
+            {loading ? "Guardando..." : "Crear actividad"}
+          </Button>
+        </form>
       </div>
     </div>
   );
