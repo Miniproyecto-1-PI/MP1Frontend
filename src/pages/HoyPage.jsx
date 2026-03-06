@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import PageHeader from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Calendar, AlertCircle } from "lucide-react";
 
 const API_URL =
   window.location.hostname === "localhost" ||
@@ -48,7 +49,7 @@ export default function HoyPage() {
   if (loading) {
     return (
       <div>
-        <PageHeader title="Hoy" description={obtenerFechaActual()} icon="📅" />
+        <PageHeader title="Hoy" description={obtenerFechaActual()} icon={Calendar} />
         <div className="mt-6 text-center text-muted-foreground">
           Cargando actividades...
         </div>
@@ -58,15 +59,16 @@ export default function HoyPage() {
 
   return (
     <div>
-      <PageHeader title="Hoy" description={obtenerFechaActual()} icon="📅" />
+      <PageHeader title="Hoy" description={obtenerFechaActual()} icon={Calendar} />
 
       <div className="mt-6">
         {error && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-            {error}
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/50 text-destructive rounded-lg flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span className="flex-1">{error}</span>
             <Button
               variant="link"
-              className="ml-2 text-red-700 p-0 h-auto"
+              className="text-destructive p-0 h-auto font-medium"
               onClick={obtenerActividadesHoy}
             >
               Reintentar

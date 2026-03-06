@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Plus, AlertCircle, CheckCircle } from "lucide-react";
 
 const API_URL =
   window.location.hostname === "localhost" ||
@@ -22,7 +23,9 @@ export default function CrearPage() {
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [fechaEntrega, setFechaEntrega] = useState("");
-  const [subtareas, setSubtareas] = useState([{ titulo: "" }]);
+  const [subtareas, setSubtareas] = useState([
+    { titulo: "", fecha_objetivo: "", horas_estimadas: "" },
+  ]);
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState(null);
   const [error, setError] = useState(null);
@@ -65,8 +68,17 @@ export default function CrearPage() {
     }
 
     subtareas.forEach((subtarea, index) => {
-      if (subtarea.titulo && subtarea.titulo.trim() === "") {
-        nuevosErrores.subtareas = `La subtarea ${index + 1} no puede estar vacía`;
+      if (!subtarea.titulo || subtarea.titulo.trim() === "") {
+        nuevosErrores.subtareas = `El nombre de la subtarea ${index + 1} no puede estar vacío`;
+        esValido = false;
+      } else if (!subtarea.fecha_objetivo) {
+        nuevosErrores.subtareas = `La fecha objetivo de la subtarea ${index + 1} es requerida`;
+        esValido = false;
+      } else if (
+        !subtarea.horas_estimadas ||
+        parseFloat(subtarea.horas_estimadas) <= 0
+      ) {
+        nuevosErrores.subtareas = `Las horas estimadas de la subtarea ${index + 1} deben ser mayores a 0`;
         esValido = false;
       }
     });
@@ -76,7 +88,10 @@ export default function CrearPage() {
   };
 
   const agregarSubtarea = () => {
-    setSubtareas([...subtareas, { titulo: "" }]);
+    setSubtareas([
+      ...subtareas,
+      { titulo: "", fecha_objetivo: "", horas_estimadas: "" },
+    ]);
     setErrors({ ...errors, subtareas: "" });
   };
 
@@ -85,9 +100,9 @@ export default function CrearPage() {
     setErrors({ ...errors, subtareas: "" });
   };
 
-  const actualizarSubtarea = (index, valor) => {
+  const actualizarSubtarea = (index, campo, valor) => {
     const nuevasSubtareas = [...subtareas];
-    nuevasSubtareas[index].titulo = valor;
+    nuevasSubtareas[index][campo] = valor;
     setSubtareas(nuevasSubtareas);
     setErrors({ ...errors, subtareas: "" });
   };
@@ -110,7 +125,12 @@ export default function CrearPage() {
         fecha_entrega: fechaEntrega,
         subtareas: subtareas
           .filter((s) => s.titulo.trim() !== "")
-          .map((s) => ({ titulo: s.titulo.trim(), completada: false })),
+          .map((s) => ({
+            titulo: s.titulo.trim(),
+            fecha_objetivo: s.fecha_objetivo,
+            horas_estimadas: parseFloat(s.horas_estimadas),
+            completada: false,
+          })),
       };
 
       const response = await fetch(`${API_URL}/actividades/`, {
@@ -145,7 +165,7 @@ export default function CrearPage() {
       setTitulo("");
       setDescripcion("");
       setFechaEntrega("");
-      setSubtareas([{ titulo: "" }]);
+      setSubtareas([{ titulo: "", fecha_objetivo: "", horas_estimadas: "" }]);
       setErrors(initialErrors);
     } catch (err) {
       setError(err.message || "Error al crear la actividad");
@@ -159,19 +179,21 @@ export default function CrearPage() {
       <PageHeader
         title="Crear actividad"
         description="Crea una nueva actividad evaluativa con su plan de trabajo"
-        icon="➕"
+        icon={Plus}
       />
 
       <div className="mt-6 max-w-2xl">
         {mensaje && (
-          <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
-            {mensaje.text}
+          <div className="mb-4 p-3 bg-green-500/10 border border-green-500/50 text-green-500 rounded-lg flex items-center gap-2">
+            <CheckCircle className="h-4 w-4 shrink-0" />
+            <span>{mensaje.text}</span>
           </div>
         )}
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-            {error}
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/50 text-destructive rounded-lg flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
@@ -261,19 +283,55 @@ export default function CrearPage() {
                 </p>
               )}
               {subtareas.map((subtarea, index) => (
-                <div key={index} className="flex gap-2">
-                  <Input
-                    type="text"
-                    placeholder={`Subtarea ${index + 1}`}
-                    value={subtarea.titulo}
-                    onChange={(e) => actualizarSubtarea(index, e.target.value)}
-                    className="flex-1"
-                  />
+                <div key={index} className="flex gap-2 items-end">
+                  <div className="flex-1 space-y-1">
+                    <Label className="text-xs">Nombre</Label>
+                    <Input
+                      type="text"
+                      placeholder={`Subtarea ${index + 1}`}
+                      value={subtarea.titulo}
+                      onChange={(e) =>
+                        actualizarSubtarea(index, "titulo", e.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="w-40 space-y-1">
+                    <Label className="text-xs">Fecha Objetivo</Label>
+                    <Input
+                      type="date"
+                      value={subtarea.fecha_objetivo || ""}
+                      onChange={(e) =>
+                        actualizarSubtarea(
+                          index,
+                          "fecha_objetivo",
+                          e.target.value,
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="w-24 space-y-1">
+                    <Label className="text-xs">Horas</Label>
+                    <Input
+                      type="number"
+                      min="0.1"
+                      step="0.1"
+                      placeholder="0.0"
+                      value={subtarea.horas_estimadas || ""}
+                      onChange={(e) =>
+                        actualizarSubtarea(
+                          index,
+                          "horas_estimadas",
+                          e.target.value,
+                        )
+                      }
+                    />
+                  </div>
                   {subtareas.length > 1 && (
                     <Button
                       type="button"
                       variant="destructive"
                       onClick={() => eliminarSubtarea(index)}
+                      className="mb-[2px]"
                     >
                       ✕
                     </Button>

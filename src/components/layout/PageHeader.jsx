@@ -5,17 +5,17 @@
  * @param {object} props
  * @param {string} props.title - Título principal de la sección
  * @param {string} props.description - Descripción breve de la sección
- * @param {string} [props.icon] - Emoji o icono decorativo
+ * @param {React.ComponentType} [props.icon] - Componente de icono (lucide-react)
  * @param {React.ReactNode} [props.actions] - Acciones adicionales (botones, etc.)
  */
-export default function PageHeader({ title, description, icon, actions }) {
+export default function PageHeader({ title, description, icon: Icon, actions }) {
   return (
     <div className="flex items-start justify-between">
       <div className="flex items-center gap-3">
-        {icon && (
-          <span className="text-3xl" role="img" aria-hidden="true">
-            {icon}
-          </span>
+        {Icon && (
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Icon className="h-6 w-6" />
+          </div>
         )}
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
