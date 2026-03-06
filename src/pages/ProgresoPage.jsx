@@ -1,4 +1,5 @@
 import PageHeader from "@/components/layout/PageHeader";
+import { TrendingUp } from "lucide-react";
 
 export default function ProgresoPage() {
   return (
@@ -6,7 +7,7 @@ export default function ProgresoPage() {
       <PageHeader
         title="Progreso"
         description="Visualiza el avance general de tus actividades evaluativas"
-        icon="📊"
+        icon={TrendingUp}
       />
       <div className="mt-6">
         <p className="text-muted-foreground">

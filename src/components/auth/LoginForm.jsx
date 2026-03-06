@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { BookOpen, Loader2 } from "lucide-react";
 
 export default function LoginForm() {
   const { login } = useAuth();
@@ -25,7 +26,6 @@ export default function LoginForm() {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simular un pequeño delay para dar feedback visual
     await new Promise((resolve) => setTimeout(resolve, 600));
 
     login({
@@ -37,10 +37,10 @@ export default function LoginForm() {
   };
 
   return (
-    <Card className="w-full max-w-md shadow-2xl border-0 bg-card/80 backdrop-blur-xl">
+    <Card className="w-full max-w-md shadow-2xl border border-border/50 bg-card/80 backdrop-blur-xl dark:bg-card/50">
       <CardHeader className="space-y-3 text-center pb-2">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground text-2xl font-bold">
-          📚
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+          <BookOpen className="h-7 w-7" />
         </div>
         <CardTitle className="text-2xl font-bold tracking-tight">
           Study Planner
@@ -88,26 +88,7 @@ export default function LoginForm() {
           >
             {isLoading ? (
               <span className="flex items-center gap-2">
-                <svg
-                  className="animate-spin h-4 w-4"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                  />
-                </svg>
+                <Loader2 className="h-4 w-4 animate-spin" />
                 Ingresando...
               </span>
             ) : (
