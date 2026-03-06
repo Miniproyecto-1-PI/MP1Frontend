@@ -3,6 +3,7 @@ import PageHeader from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, AlertCircle } from "lucide-react";
+import { Link } from "react-router";
 
 const API_URL =
   window.location.hostname === "localhost" ||
@@ -49,7 +50,11 @@ export default function HoyPage() {
   if (loading) {
     return (
       <div>
-        <PageHeader title="Hoy" description={obtenerFechaActual()} icon={Calendar} />
+        <PageHeader
+          title="Hoy"
+          description={obtenerFechaActual()}
+          icon={Calendar}
+        />
         <div className="mt-6 text-center text-muted-foreground">
           Cargando actividades...
         </div>
@@ -59,7 +64,11 @@ export default function HoyPage() {
 
   return (
     <div>
-      <PageHeader title="Hoy" description={obtenerFechaActual()} icon={Calendar} />
+      <PageHeader
+        title="Hoy"
+        description={obtenerFechaActual()}
+        icon={Calendar}
+      />
 
       <div className="mt-6">
         {error && (
@@ -104,7 +113,7 @@ export default function HoyPage() {
                       {actividad.titulo}
                     </CardTitle>
                     <Button variant="outline" size="sm" asChild>
-                      <a href={`/actividad/${actividad.id}`}>Ver</a>
+                      <Link to={`/actividad/${actividad.id}`}>Ver</Link>
                     </Button>
                   </div>
                 </CardHeader>
