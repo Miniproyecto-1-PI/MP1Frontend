@@ -98,6 +98,18 @@ export default function HoyPage() {
         icon={Calendar}
       />
 
+      <div className="mt-4 p-3.5 bg-muted/30 border border-border/50 rounded-lg text-sm text-muted-foreground leading-relaxed">
+        <p className="font-semibold text-foreground mb-1 flex items-center gap-2">
+          <Clock className="h-4 w-4 text-primary" /> Regla de priorización:
+        </p>
+        <ul className="list-disc list-inside space-y-0.5 ml-1 marker:text-muted-foreground/50">
+          <li><strong>Vencidas:</strong> Más antiguas primero, luego por mayor carga horaria.</li>
+          <li><strong>Hoy:</strong> Mayor carga horaria primero.</li>
+          <li><strong>Próximas:</strong> Fecha más cercana, luego por mayor carga horaria.</li>
+        </ul>
+        <p className="mt-1.5 text-xs opacity-70 italic">* En caso de empate, se ordenan alfabéticamente por título.</p>
+      </div>
+
       <div className="mt-6">
         {/* Error */}
         {error && (

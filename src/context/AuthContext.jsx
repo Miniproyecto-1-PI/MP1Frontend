@@ -26,7 +26,7 @@ export function AuthProvider({ children }) {
 
       if (!response.ok) {
         // Mensaje genérico — no revela si el usuario existe
-        const errorMsg = data.detail || data.non_field_errors?.[0] || "Credenciales inválidas";
+        const errorMsg = data.detail || data.non_field_errors?.[0] || "La contrasena o el usuario son incorrectos";
         setAuthError(errorMsg);
         return false;
       }
