@@ -5,13 +5,39 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { FileText, AlertCircle, CheckCircle, Trash2 } from "lucide-react";
+import {
+  FileText,
+  AlertCircle,
+  CheckCircle,
+  Trash2,
+  Loader2,
+  AlertTriangle,
+  CalendarIcon,
+  Clock,
+  ArrowRight,
+  X,
+} from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
-const API_URL =
-  window.location.hostname === "localhost" ||
-  window.location.hostname === "127.0.0.1"
-    ? "http://127.0.0.1:8000/api"
-    : "https://mp1backend.onrender.com/api";
+const TIPOS_ACTIVIDAD = [
+  { value: "tarea", label: "Tarea" },
+  { value: "proyecto", label: "Proyecto" },
+  { value: "examen", label: "Examen" },
+  { value: "quiz", label: "Quiz" },
+  { value: "laboratorio", label: "Laboratorio" },
+  { value: "lectura", label: "Lectura" },
+  { value: "otro", label: "Otro" },
+];
+
+const TIPOS_SUBTAREA = [
+  { value: "investigacion", label: "Investigación" },
+  { value: "redaccion", label: "Redacción" },
+  { value: "programacion", label: "Programación" },
+  { value: "estudio", label: "Estudio" },
+  { value: "revision", label: "Revisión" },
+  { value: "practica", label: "Práctica" },
+  { value: "otro", label: "Otro" },
+];
 
 const initialErrors = {
   titulo: "",
@@ -26,6 +52,7 @@ export default function ActividadPage() {
 
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  const [tipo, setTipo] = useState("tarea");
   const [fechaEntrega, setFechaEntrega] = useState("");
   const [subtareas, setSubtareas] = useState([]);
 
@@ -35,16 +62,21 @@ export default function ActividadPage() {
   const [error, setError] = useState(null);
   const [errors, setErrors] = useState(initialErrors);
 
+  // ── Conflict state ──
+  const [conflicto, setConflicto] = useState(null);
+  const [conflictoSubtareaIndex, setConflictoSubtareaIndex] = useState(null);
+
   useEffect(() => {
     const fetchActividad = async () => {
       try {
-        const response = await fetch(`${API_URL}/actividades/${id}/`);
+        const response = await apiFetch(`/actividades/${id}/`);
         if (!response.ok) {
           throw new Error("Actividad no encontrada");
         }
         const data = await response.json();
         setTitulo(data.titulo);
         setDescripcion(data.descripcion || "");
+        setTipo(data.tipo || "tarea");
         setFechaEntrega(data.fecha_entrega);
         setSubtareas(data.subtareas || []);
       } catch (err) {
@@ -55,6 +87,40 @@ export default function ActividadPage() {
     };
     fetchActividad();
   }, [id]);
+
+  // ── Verificar conflicto al cambiar fecha_objetivo de una subtarea ──
+  const verificarConflicto = async (index, nuevaFecha) => {
+    const subtarea = subtareas[index];
+    const horas = parseFloat(subtarea.horas_estimadas);
+    if (!nuevaFecha || !horas || horas <= 0) return;
+
+    try {
+      const response = await apiFetch("/conflicto/verificar/", {
+        method: "POST",
+        body: JSON.stringify({
+          fecha: nuevaFecha,
+          horas_nuevas: horas,
+          subtarea_id: subtarea.id || undefined,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.hay_conflicto) {
+          setConflicto(data);
+          setConflictoSubtareaIndex(index);
+        } else {
+          // Sin conflicto — limpiar si era de esta subtarea
+          if (conflictoSubtareaIndex === index) {
+            setConflicto(null);
+            setConflictoSubtareaIndex(null);
+          }
+        }
+      }
+    } catch {
+      // Silenciar errores de verificación
+    }
+  };
 
   const validarFormulario = () => {
     const nuevosErrores = { ...initialErrors };
@@ -117,6 +183,7 @@ export default function ActividadPage() {
       ...subtareas,
       {
         titulo: "",
+        tipo: "otro",
         fecha_objetivo: "",
         horas_estimadas: "",
         completada: false,
@@ -128,6 +195,10 @@ export default function ActividadPage() {
   const eliminarSubtareaUI = (index) => {
     setSubtareas(subtareas.filter((_, i) => i !== index));
     setErrors({ ...errors, subtareas: "" });
+    if (conflictoSubtareaIndex === index) {
+      setConflicto(null);
+      setConflictoSubtareaIndex(null);
+    }
   };
 
   const actualizarSubtarea = (index, campo, valor) => {
@@ -135,6 +206,66 @@ export default function ActividadPage() {
     nuevasSubtareas[index][campo] = valor;
     setSubtareas(nuevasSubtareas);
     setErrors({ ...errors, subtareas: "" });
+
+    // Verificar conflicto al cambiar fecha_objetivo
+    if (campo === "fecha_objetivo" && valor) {
+      verificarConflicto(index, valor);
+    }
+  };
+
+  // ── Conflict resolution actions ──
+  const handleConflictAction = (accion) => {
+    const idx = conflictoSubtareaIndex;
+    if (idx === null) return;
+
+    switch (accion) {
+      case "mover": {
+        // Limpiar la fecha para que el usuario elija otra
+        const nuevasSubtareas = [...subtareas];
+        nuevasSubtareas[idx].fecha_objetivo = "";
+        setSubtareas(nuevasSubtareas);
+        setConflicto(null);
+        setConflictoSubtareaIndex(null);
+        break;
+      }
+      case "reducir": {
+        // Reducir horas para que quepa en el límite
+        const disponible = conflicto.limite - conflicto.horas_actuales;
+        if (disponible > 0) {
+          const nuevasSubtareas = [...subtareas];
+          nuevasSubtareas[idx].horas_estimadas = disponible.toFixed(1);
+          setSubtareas(nuevasSubtareas);
+        }
+        setConflicto(null);
+        setConflictoSubtareaIndex(null);
+        break;
+      }
+      case "posponer": {
+        // Mover al día siguiente
+        const fechaActual = subtareas[idx].fecha_objetivo;
+        if (fechaActual) {
+          const siguiente = new Date(fechaActual + "T00:00:00");
+          siguiente.setDate(siguiente.getDate() + 1);
+          const nuevaFecha = siguiente.toISOString().split("T")[0];
+          const nuevasSubtareas = [...subtareas];
+          nuevasSubtareas[idx].fecha_objetivo = nuevaFecha;
+          setSubtareas(nuevasSubtareas);
+          // Re-verificar conflicto en la nueva fecha
+          setConflicto(null);
+          setConflictoSubtareaIndex(null);
+          verificarConflicto(idx, nuevaFecha);
+        }
+        break;
+      }
+      case "forzar": {
+        // Ignorar conflicto y continuar
+        setConflicto(null);
+        setConflictoSubtareaIndex(null);
+        break;
+      }
+      default:
+        break;
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -152,23 +283,22 @@ export default function ActividadPage() {
       const payload = {
         titulo: titulo.trim(),
         descripcion: descripcion.trim(),
+        tipo,
         fecha_entrega: fechaEntrega,
         subtareas: subtareas
           .filter((s) => s.titulo.trim() !== "")
           .map((s) => ({
-            id: s.id, // Include ID if it exists for the backend to update instead of recreate
+            id: s.id,
             titulo: s.titulo.trim(),
+            tipo: s.tipo || "otro",
             fecha_objetivo: s.fecha_objetivo,
             horas_estimadas: parseFloat(s.horas_estimadas),
             completada: s.completada || false,
           })),
       };
 
-      const response = await fetch(`${API_URL}/actividades/${id}/`, {
+      const response = await apiFetch(`/actividades/${id}/`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(payload),
       });
 
@@ -198,7 +328,7 @@ export default function ActividadPage() {
         type: "success",
         text: `Actividad editada correctamente`,
       });
-      setSubtareas(data.subtareas || []); // Refresh with IDs
+      setSubtareas(data.subtareas || []);
       setErrors(initialErrors);
     } catch (err) {
       setError(err.message || "Error al editar la actividad");
@@ -217,7 +347,7 @@ export default function ActividadPage() {
     }
     setSaving(true);
     try {
-      const response = await fetch(`${API_URL}/actividades/${id}/`, {
+      const response = await apiFetch(`/actividades/${id}/`, {
         method: "DELETE",
       });
 
@@ -225,7 +355,7 @@ export default function ActividadPage() {
         throw new Error("No se pudo eliminar la actividad");
       }
 
-      navigate("/hoy"); // Or somewhere else
+      navigate("/hoy");
     } catch (err) {
       setError(err.message);
       setSaving(false);
@@ -240,8 +370,9 @@ export default function ActividadPage() {
           description="Cargando..."
           icon={FileText}
         />
-        <div className="mt-6 text-center text-muted-foreground">
-          Cargando detalles...
+        <div className="mt-8 flex flex-col items-center gap-3 text-muted-foreground">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <p>Cargando detalles...</p>
         </div>
       </div>
     );
@@ -270,6 +401,83 @@ export default function ActividadPage() {
           </div>
         )}
 
+        {/* ──────── CONFLICT MODAL ──────── */}
+        {conflicto && (
+          <div
+            className="mb-4 p-4 bg-amber-500/10 border-2 border-amber-500/50 rounded-xl"
+            role="alert"
+            aria-live="assertive"
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/20">
+                <AlertTriangle className="h-5 w-5 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-amber-700 dark:text-amber-400 text-base">
+                  Conflicto de sobrecarga detectado
+                </h3>
+                <p className="text-sm text-amber-600 dark:text-amber-300 mt-1">
+                  {conflicto.mensaje}
+                </p>
+                <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <CalendarIcon className="h-3 w-3" />
+                    {conflicto.fecha}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {conflicto.horas_actuales}h actuales + {(conflicto.horas_con_nueva - conflicto.horas_actuales).toFixed(1)}h nueva
+                  </span>
+                </div>
+
+                {/* Alternativas */}
+                <div className="mt-4 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    ¿Cómo quieres resolverlo?
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {conflicto.alternativas?.map((alt) => (
+                      <button
+                        key={alt.accion}
+                        type="button"
+                        onClick={() => handleConflictAction(alt.accion)}
+                        className={`flex items-center gap-2 p-3 rounded-lg border text-left text-sm transition-colors hover:bg-accent cursor-pointer ${
+                          alt.accion === "forzar"
+                            ? "border-destructive/30 text-destructive hover:bg-destructive/10"
+                            : "border-border hover:border-primary/30"
+                        }`}
+                      >
+                        <span className="flex-1">
+                          <span className="block font-medium">
+                            {alt.accion === "mover" && "📅 Mover a otro día"}
+                            {alt.accion === "reducir" && "⏱️ Reducir horas"}
+                            {alt.accion === "posponer" && "➡️ Posponer un día"}
+                            {alt.accion === "forzar" && "⚠️ Guardar igual"}
+                          </span>
+                          <span className="block text-xs text-muted-foreground mt-0.5">
+                            {alt.descripcion}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setConflicto(null);
+                  setConflictoSubtareaIndex(null);
+                }}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Cerrar alerta de conflicto"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} noValidate>
           <Card>
             <CardHeader>
@@ -292,6 +500,22 @@ export default function ActividadPage() {
                 {errors.titulo && (
                   <p className="text-red-500 text-sm mt-1">{errors.titulo}</p>
                 )}
+              </div>
+
+              <div>
+                <Label htmlFor="tipo-actividad">Tipo de actividad</Label>
+                <select
+                  id="tipo-actividad"
+                  value={tipo}
+                  onChange={(e) => setTipo(e.target.value)}
+                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  {TIPOS_ACTIVIDAD.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -356,7 +580,14 @@ export default function ActividadPage() {
                 </p>
               )}
               {subtareas.map((subtarea, index) => (
-                <div key={index} className="flex gap-2 items-end">
+                <div
+                  key={subtarea.id || index}
+                  className={`flex gap-2 items-end flex-wrap p-2 rounded-lg transition-colors ${
+                    conflictoSubtareaIndex === index
+                      ? "bg-amber-500/10 border border-amber-500/30"
+                      : ""
+                  }`}
+                >
                   <div className="w-8 pb-3 flex justify-center">
                     <input
                       type="checkbox"
@@ -370,9 +601,10 @@ export default function ActividadPage() {
                       }
                       className="h-4 w-4 rounded border-gray-300 cursor-pointer"
                       title="Marcar como completada"
+                      aria-label={`Marcar "${subtarea.titulo}" como completada`}
                     />
                   </div>
-                  <div className="flex-1 space-y-1">
+                  <div className="flex-1 min-w-[120px] space-y-1">
                     <Label className="text-xs">Nombre</Label>
                     <Input
                       type="text"
@@ -387,6 +619,22 @@ export default function ActividadPage() {
                           : ""
                       }
                     />
+                  </div>
+                  <div className="w-32 space-y-1">
+                    <Label className="text-xs">Tipo</Label>
+                    <select
+                      value={subtarea.tipo || "otro"}
+                      onChange={(e) =>
+                        actualizarSubtarea(index, "tipo", e.target.value)
+                      }
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      {TIPOS_SUBTAREA.map((t) => (
+                        <option key={t.value} value={t.value}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="w-36 space-y-1">
                     <Label className="text-xs">Fecha Objetivo</Label>
@@ -447,7 +695,14 @@ export default function ActividadPage() {
               <Trash2 className="h-4 w-4 mr-2" /> Eliminar Actividad
             </Button>
             <Button type="submit" className="flex-1" disabled={saving}>
-              {saving ? "Guardando..." : "Guardar cambios"}
+              {saving ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Guardando...
+                </span>
+              ) : (
+                "Guardar cambios"
+              )}
             </Button>
           </div>
         </form>

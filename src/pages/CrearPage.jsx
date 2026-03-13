@@ -4,13 +4,28 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Plus, AlertCircle, CheckCircle } from "lucide-react";
+import { Plus, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
-const API_URL =
-  window.location.hostname === "localhost" ||
-  window.location.hostname === "127.0.0.1"
-    ? "http://127.0.0.1:8000/api"
-    : "https://mp1backend.onrender.com/api";
+const TIPOS_ACTIVIDAD = [
+  { value: "tarea", label: "Tarea" },
+  { value: "proyecto", label: "Proyecto" },
+  { value: "examen", label: "Examen" },
+  { value: "quiz", label: "Quiz" },
+  { value: "laboratorio", label: "Laboratorio" },
+  { value: "lectura", label: "Lectura" },
+  { value: "otro", label: "Otro" },
+];
+
+const TIPOS_SUBTAREA = [
+  { value: "investigacion", label: "Investigación" },
+  { value: "redaccion", label: "Redacción" },
+  { value: "programacion", label: "Programación" },
+  { value: "estudio", label: "Estudio" },
+  { value: "revision", label: "Revisión" },
+  { value: "practica", label: "Práctica" },
+  { value: "otro", label: "Otro" },
+];
 
 const initialErrors = {
   titulo: "",
@@ -22,9 +37,10 @@ const initialErrors = {
 export default function CrearPage() {
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  const [tipo, setTipo] = useState("tarea");
   const [fechaEntrega, setFechaEntrega] = useState("");
   const [subtareas, setSubtareas] = useState([
-    { titulo: "", fecha_objetivo: "", horas_estimadas: "" },
+    { titulo: "", tipo: "otro", fecha_objetivo: "", horas_estimadas: "" },
   ]);
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState(null);
@@ -90,7 +106,7 @@ export default function CrearPage() {
   const agregarSubtarea = () => {
     setSubtareas([
       ...subtareas,
-      { titulo: "", fecha_objetivo: "", horas_estimadas: "" },
+      { titulo: "", tipo: "otro", fecha_objetivo: "", horas_estimadas: "" },
     ]);
     setErrors({ ...errors, subtareas: "" });
   };
@@ -122,22 +138,21 @@ export default function CrearPage() {
       const payload = {
         titulo: titulo.trim(),
         descripcion: descripcion.trim(),
+        tipo,
         fecha_entrega: fechaEntrega,
         subtareas: subtareas
           .filter((s) => s.titulo.trim() !== "")
           .map((s) => ({
             titulo: s.titulo.trim(),
+            tipo: s.tipo,
             fecha_objetivo: s.fecha_objetivo,
             horas_estimadas: parseFloat(s.horas_estimadas),
             completada: false,
           })),
       };
 
-      const response = await fetch(`${API_URL}/actividades/`, {
+      const response = await apiFetch("/actividades/", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(payload),
       });
 
@@ -164,8 +179,11 @@ export default function CrearPage() {
 
       setTitulo("");
       setDescripcion("");
+      setTipo("tarea");
       setFechaEntrega("");
-      setSubtareas([{ titulo: "", fecha_objetivo: "", horas_estimadas: "" }]);
+      setSubtareas([
+        { titulo: "", tipo: "otro", fecha_objetivo: "", horas_estimadas: "" },
+      ]);
       setErrors(initialErrors);
     } catch (err) {
       setError(err.message || "Error al crear la actividad");
@@ -219,6 +237,22 @@ export default function CrearPage() {
                 {errors.titulo && (
                   <p className="text-red-500 text-sm mt-1">{errors.titulo}</p>
                 )}
+              </div>
+
+              <div>
+                <Label htmlFor="tipo">Tipo de actividad</Label>
+                <select
+                  id="tipo"
+                  value={tipo}
+                  onChange={(e) => setTipo(e.target.value)}
+                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  {TIPOS_ACTIVIDAD.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -283,8 +317,8 @@ export default function CrearPage() {
                 </p>
               )}
               {subtareas.map((subtarea, index) => (
-                <div key={index} className="flex gap-2 items-end">
-                  <div className="flex-1 space-y-1">
+                <div key={index} className="flex gap-2 items-end flex-wrap">
+                  <div className="flex-1 min-w-[150px] space-y-1">
                     <Label className="text-xs">Nombre</Label>
                     <Input
                       type="text"
@@ -295,7 +329,23 @@ export default function CrearPage() {
                       }
                     />
                   </div>
-                  <div className="w-40 space-y-1">
+                  <div className="w-36 space-y-1">
+                    <Label className="text-xs">Tipo</Label>
+                    <select
+                      value={subtarea.tipo}
+                      onChange={(e) =>
+                        actualizarSubtarea(index, "tipo", e.target.value)
+                      }
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      {TIPOS_SUBTAREA.map((t) => (
+                        <option key={t.value} value={t.value}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="w-36 space-y-1">
                     <Label className="text-xs">Fecha Objetivo</Label>
                     <Input
                       type="date"
@@ -345,7 +395,14 @@ export default function CrearPage() {
           </Card>
 
           <Button type="submit" className="mt-4 w-full" disabled={loading}>
-            {loading ? "Guardando..." : "Crear actividad"}
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Guardando...
+              </span>
+            ) : (
+              "Crear actividad"
+            )}
           </Button>
         </form>
       </div>

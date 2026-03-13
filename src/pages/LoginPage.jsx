@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { Navigate } from "react-router";
 import { useAuth } from "@/context/AuthContext";
 import LoginForm from "@/components/auth/LoginForm";
+import RegisterForm from "@/components/auth/RegisterForm";
 
 export default function LoginPage() {
   const { isAuthenticated } = useAuth();
+  const [showRegister, setShowRegister] = useState(false);
 
   if (isAuthenticated) {
     return <Navigate to="/hoy" replace />;
@@ -28,7 +31,11 @@ export default function LoginPage() {
       />
 
       <div className="relative z-10 w-full px-4">
-        <LoginForm />
+        {showRegister ? (
+          <RegisterForm onSwitchToLogin={() => setShowRegister(false)} />
+        ) : (
+          <LoginForm onSwitchToRegister={() => setShowRegister(true)} />
+        )}
         <p className="text-center text-xs text-white/30 mt-6">
           Mini-Proyecto 1 · Planificador de Estudio
         </p>
