@@ -10,34 +10,34 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { BookOpen, Loader2 } from "lucide-react";
+import { BookOpen, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
 
-export default function LoginForm() {
-  const { login } = useAuth();
-  const [formData, setFormData] = useState({ name: "", email: "" });
+export default function LoginForm({ onSwitchToRegister }) {
+  const { login, authError, clearError } = useAuth();
+  const [formData, setFormData] = useState({ username: "", password: "" });
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (authError) clearError();
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!formData.username.trim() || !formData.password.trim()) {
+      return;
+    }
+
     setIsLoading(true);
-
-    await new Promise((resolve) => setTimeout(resolve, 600));
-
-    login({
-      name: formData.name || "Estudiante",
-      email: formData.email || "estudiante@universidad.edu",
-    });
-
+    await login(formData.username, formData.password);
     setIsLoading(false);
   };
 
   return (
-    <Card className="w-full max-w-md shadow-2xl border border-border/50 bg-card/80 backdrop-blur-xl dark:bg-card/50">
+    <Card className="w-full max-w-md shadow-2xl border border-border/50 bg-card/80 backdrop-blur-xl dark:bg-card/50 mx-auto">
       <CardHeader className="space-y-3 text-center pb-2">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
           <BookOpen className="h-7 w-7" />
@@ -46,58 +46,96 @@ export default function LoginForm() {
           Study Planner
         </CardTitle>
         <CardDescription className="text-muted-foreground">
-          Planificador de actividades evaluativas
+          Inicia sesión para acceder a tu planificador
         </CardDescription>
       </CardHeader>
 
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+          {/* Error message */}
+          {authError && (
+            <div
+              className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/30 text-destructive rounded-lg text-sm"
+              role="alert"
+              aria-live="polite"
+            >
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{authError}</span>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <Label htmlFor="login-name">Nombre</Label>
+            <Label htmlFor="login-username">Usuario</Label>
             <Input
-              id="login-name"
-              name="name"
+              id="login-username"
+              name="username"
               type="text"
-              placeholder="Tu nombre"
-              value={formData.name}
+              placeholder="Tu nombre de usuario"
+              value={formData.username}
               onChange={handleChange}
-              autoComplete="name"
+              autoComplete="username"
               className="h-11"
+              required
+              aria-required="true"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="login-email">Correo electrónico</Label>
-            <Input
-              id="login-email"
-              name="email"
-              type="email"
-              placeholder="correo@universidad.edu"
-              value={formData.email}
-              onChange={handleChange}
-              autoComplete="email"
-              className="h-11"
-            />
+            <Label htmlFor="login-password">Contraseña</Label>
+            <div className="relative">
+              <Input
+                id="login-password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Tu contraseña"
+                value={formData.password}
+                onChange={handleChange}
+                autoComplete="current-password"
+                className="h-11 pr-10"
+                required
+                aria-required="true"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
 
           <Button
             id="login-submit"
             type="submit"
             className="w-full h-11 text-base font-semibold cursor-pointer"
-            disabled={isLoading}
+            disabled={isLoading || !formData.username.trim() || !formData.password.trim()}
           >
             {isLoading ? (
               <span className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Ingresando...
+                Iniciando sesión...
               </span>
             ) : (
-              "Ingresar"
+              "Iniciar sesión"
             )}
           </Button>
 
-          <p className="text-xs text-center text-muted-foreground pt-1">
-            Ingresa cualquier dato para comenzar
+          <p className="text-sm text-center text-muted-foreground pt-1">
+            ¿No tienes cuenta?{" "}
+            <button
+              type="button"
+              onClick={onSwitchToRegister}
+              className="text-primary font-medium hover:underline cursor-pointer"
+            >
+              Crear cuenta
+            </button>
           </p>
         </form>
       </CardContent>
