@@ -39,9 +39,8 @@ export default function CrearPage() {
   const [descripcion, setDescripcion] = useState("");
   const [tipo, setTipo] = useState("tarea");
   const [fechaEntrega, setFechaEntrega] = useState("");
-  const [subtareas, setSubtareas] = useState([
-    { titulo: "", tipo: "otro", fecha_objetivo: "", horas_estimadas: "" },
-  ]);
+  const [subtareas, setSubtareas] = useState([]);
+  const [mostrarSubtareas, setMostrarSubtareas] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState(null);
   const [error, setError] = useState(null);
@@ -85,9 +84,11 @@ export default function CrearPage() {
 
     subtareas.forEach((subtarea, index) => {
       if (!subtarea.titulo || subtarea.titulo.trim() === "") {
-        nuevosErrores.subtareas = `El nombre de la subtarea ${index + 1} no puede estar vacío`;
-        esValido = false;
-      } else if (!subtarea.fecha_objetivo) {
+        // Es opcional, la ignoramos al guardar
+        return;
+      }
+      
+      if (!subtarea.fecha_objetivo) {
         nuevosErrores.subtareas = `La fecha objetivo de la subtarea ${index + 1} es requerida`;
         esValido = false;
       } else if (
@@ -104,6 +105,7 @@ export default function CrearPage() {
   };
 
   const agregarSubtarea = () => {
+    setMostrarSubtareas(true);
     setSubtareas([
       ...subtareas,
       { titulo: "", tipo: "otro", fecha_objetivo: "", horas_estimadas: "" },
@@ -181,9 +183,8 @@ export default function CrearPage() {
       setDescripcion("");
       setTipo("tarea");
       setFechaEntrega("");
-      setSubtareas([
-        { titulo: "", tipo: "otro", fecha_objetivo: "", horas_estimadas: "" },
-      ]);
+      setSubtareas([]);
+      setMostrarSubtareas(false);
       setErrors(initialErrors);
     } catch (err) {
       setError(err.message || "Error al crear la actividad");
@@ -304,19 +305,20 @@ export default function CrearPage() {
           </Card>
 
           <Card className="mt-4">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Subtareas / Hitos</CardTitle>
-              <Button type="button" variant="outline" onClick={agregarSubtarea}>
-                + Agregar
+            <CardHeader className="flex flex-row items-center justify-between cursor-pointer" onClick={() => setMostrarSubtareas(!mostrarSubtareas)}>
+              <CardTitle>Subtareas (Opcional)</CardTitle>
+              <Button type="button" variant="outline" onClick={(e) => { e.stopPropagation(); agregarSubtarea(); }}>
+                + Agregar subtarea
               </Button>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {subtareas.length === 0 && (
-                <p className="text-muted-foreground text-sm">
-                  No hay subtareas agregadas
-                </p>
-              )}
-              {subtareas.map((subtarea, index) => (
+            {mostrarSubtareas && (
+              <CardContent className="space-y-3">
+                {subtareas.length === 0 && (
+                  <p className="text-muted-foreground text-sm pb-2">
+                    No hay subtareas agregadas. Presiona "+ Agregar subtarea" para comenzar.
+                  </p>
+                )}
+                {subtareas.map((subtarea, index) => (
                 <div key={index} className="flex gap-2 items-end flex-wrap">
                   <div className="flex-1 min-w-[150px] space-y-1">
                     <Label className="text-xs">Nombre</Label>
@@ -376,22 +378,21 @@ export default function CrearPage() {
                       }
                     />
                   </div>
-                  {subtareas.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      onClick={() => eliminarSubtarea(index)}
-                      className="mb-[2px]"
-                    >
-                      ✕
-                    </Button>
-                  )}
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => eliminarSubtarea(index)}
+                    className="mb-[2px]"
+                  >
+                    ✕
+                  </Button>
                 </div>
               ))}
               {errors.subtareas && (
                 <p className="text-red-500 text-sm">{errors.subtareas}</p>
               )}
             </CardContent>
+            )}
           </Card>
 
           <Button type="submit" className="mt-4 w-full" disabled={loading}>

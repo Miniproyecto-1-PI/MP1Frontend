@@ -16,7 +16,7 @@ export default function RegisterForm({ onSwitchToLogin }) {
   const { registro, authError, clearError } = useAuth();
   const [formData, setFormData] = useState({
     first_name: "",
-    username: "",
+
     email: "",
     password: "",
     password_confirm: "",
@@ -37,8 +37,7 @@ export default function RegisterForm({ onSwitchToLogin }) {
   const validate = () => {
     const errs = {};
     if (!formData.first_name.trim()) errs.first_name = "Tu nombre es requerido";
-    if (!formData.username.trim()) errs.username = "El usuario es requerido";
-    else if (formData.username.trim().length < 3) errs.username = "Mínimo 3 caracteres";
+
     if (!formData.email.trim()) errs.email = "El correo es requerido";
     if (!formData.password) errs.password = "La contraseña es requerida";
     else if (formData.password.length < 6) errs.password = "Mínimo 6 caracteres";
@@ -108,22 +107,7 @@ export default function RegisterForm({ onSwitchToLogin }) {
             {renderFieldError("first_name")}
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="register-username">Usuario</Label>
-            <Input
-              id="register-username"
-              name="username"
-              type="text"
-              placeholder="Nombre de usuario"
-              value={formData.username}
-              onChange={handleChange}
-              autoComplete="username"
-              className="h-11"
-              required
-              aria-required="true"
-            />
-            {renderFieldError("username")}
-          </div>
+
 
           <div className="space-y-1.5">
             <Label htmlFor="register-email">Correo electrónico</Label>

@@ -5,6 +5,7 @@ import HoyPage from "@/pages/HoyPage";
 import CrearPage from "@/pages/CrearPage";
 import ActividadPage from "@/pages/ActividadPage";
 import ProgresoPage from "@/pages/ProgresoPage";
+import ConfiguracionPage from "@/pages/ConfiguracionPage";
 
 /**
  * Router configurado con React Router v7 data mode.
@@ -51,6 +52,10 @@ const router = createBrowserRouter([
         path: "progreso",
         Component: ProgresoPage,
         // loader: progresoLoader, ← Loader para métricas de progreso
+      },
+      {
+        path: "configuracion",
+        Component: ConfiguracionPage,
       },
     ],
   },

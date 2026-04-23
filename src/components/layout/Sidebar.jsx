@@ -2,7 +2,7 @@ import { NavLink } from "react-router";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Calendar, Plus, TrendingUp, LogOut, BookOpen } from "lucide-react";
+import { Calendar, Plus, TrendingUp, LogOut, BookOpen, Settings } from "lucide-react";
 
 const NAV_ITEMS = [
   {
@@ -22,6 +22,12 @@ const NAV_ITEMS = [
     label: "Progreso",
     icon: TrendingUp,
     description: "Visualizar avance",
+  },
+  {
+    to: "/configuracion",
+    label: "Configuración",
+    icon: Settings,
+    description: "Preferencias del sistema",
   },
 ];
 

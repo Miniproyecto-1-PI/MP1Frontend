@@ -71,7 +71,9 @@ export default function HoyPage() {
   const totalItems =
     (data?.vencidas?.length || 0) +
     (data?.hoy?.length || 0) +
-    (data?.proximas?.length || 0);
+    (data?.proximas?.length || 0) +
+    (data?.actividades_hoy?.length || 0) +
+    (data?.actividades_sin_planificar?.length || 0);
 
   // ────────────────────── Loading ──────────────────────
   if (loading) {
@@ -98,17 +100,20 @@ export default function HoyPage() {
         icon={Calendar}
       />
 
-      <div className="mt-4 p-3.5 bg-muted/30 border border-border/50 rounded-lg text-sm text-muted-foreground leading-relaxed">
-        <p className="font-semibold text-foreground mb-1 flex items-center gap-2">
-          <Clock className="h-4 w-4 text-primary" /> Regla de priorización:
-        </p>
-        <ul className="list-disc list-inside space-y-0.5 ml-1 marker:text-muted-foreground/50">
-          <li><strong>Vencidas:</strong> Más antiguas primero, luego por mayor carga horaria.</li>
-          <li><strong>Hoy:</strong> Mayor carga horaria primero.</li>
-          <li><strong>Próximas:</strong> Fecha más cercana, luego por mayor carga horaria.</li>
-        </ul>
-        <p className="mt-1.5 text-xs opacity-70 italic">* En caso de empate, se ordenan alfabéticamente por título.</p>
-      </div>
+      {/* Regla de priorización oculta */}
+      {false && (
+        <div className="mt-4 p-3.5 bg-muted/30 border border-border/50 rounded-lg text-sm text-muted-foreground leading-relaxed">
+          <p className="font-semibold text-foreground mb-1 flex items-center gap-2">
+            <Clock className="h-4 w-4 text-primary" /> Regla de priorización:
+          </p>
+          <ul className="list-disc list-inside space-y-0.5 ml-1 marker:text-muted-foreground/50">
+            <li><strong>Vencidas:</strong> Más antiguas primero, luego por mayor carga horaria.</li>
+            <li><strong>Hoy:</strong> Mayor carga horaria primero.</li>
+            <li><strong>Próximas:</strong> Fecha más cercana, luego por mayor carga horaria.</li>
+          </ul>
+          <p className="mt-1.5 text-xs opacity-70 italic">* En caso de empate, se ordenan alfabéticamente por título.</p>
+        </div>
+      )}
 
       <div className="mt-6">
         {/* Error */}
@@ -279,6 +284,98 @@ export default function HoyPage() {
                       </div>
                       <Button variant="ghost" size="sm" asChild>
                         <Link to={`/actividad/${subtarea.actividad.id}`}>
+                          <ArrowRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ──────── ACTIVIDADES (ENTREGAS HOY) ──────── */}
+        {data?.actividades_hoy?.length > 0 && (
+          <section className="mb-6" aria-label="Entregas de hoy">
+            <div className="flex items-center gap-2 mb-3">
+              <Calendar className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold text-primary uppercase tracking-wide">
+                Entregas de Actividades Hoy ({data.actividades_hoy.length})
+              </h2>
+            </div>
+            <div className="space-y-2">
+              {data.actividades_hoy.map((actividad) => (
+                <Card
+                  key={`a-${actividad.id}`}
+                  className="border-primary/20 hover:shadow-md transition-shadow bg-primary/5"
+                >
+                  <CardContent className="py-3 px-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium truncate">
+                            {actividad.titulo}
+                          </span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary-foreground border">
+                            Actividad
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                          <span className="text-primary font-medium">Se entrega hoy</span>
+                          {(!actividad.subtareas || actividad.subtareas.length === 0) && (
+                            <>
+                              <span>·</span>
+                              <span className="text-amber-600 font-medium">Sin subtareas planificadas</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link to={`/actividad/${actividad.id}`}>
+                          <ArrowRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ──────── ACTIVIDADES SIN PLANIFICAR ──────── */}
+        {data?.actividades_sin_planificar?.length > 0 && (
+          <section className="mb-6" aria-label="Actividades sin planificar">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertCircle className="h-4 w-4 text-amber-500" />
+              <h2 className="text-sm font-semibold text-amber-500 uppercase tracking-wide">
+                Sin planificar ({data.actividades_sin_planificar.length})
+              </h2>
+            </div>
+            <div className="space-y-2">
+              {data.actividades_sin_planificar.map((actividad) => (
+                <Card
+                  key={`ap-${actividad.id}`}
+                  className="border-amber-500/20 hover:shadow-md transition-shadow bg-amber-500/5"
+                >
+                  <CardContent className="py-3 px-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium truncate">
+                            {actividad.titulo}
+                          </span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                            Falta planificar
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                          <span>Entrega: {formatFecha(actividad.fecha_entrega)}</span>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link to={`/actividad/${actividad.id}`}>
                           <ArrowRight className="h-4 w-4" />
                         </Link>
                       </Button>

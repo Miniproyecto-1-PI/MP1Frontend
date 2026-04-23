@@ -13,20 +13,20 @@ export function AuthProvider({ children }) {
 
   const isAuthenticated = !!user && !!getTokens()?.access;
 
-  const login = useCallback(async (username, password) => {
+  const login = useCallback(async (email, password) => {
     setAuthError(null);
     try {
       const response = await fetch(`${API_URL}/auth/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
         // Mensaje genérico — no revela si el usuario existe
-        const errorMsg = data.detail || data.non_field_errors?.[0] || "La contrasena o el usuario son incorrectos";
+        const errorMsg = data.detail || data.non_field_errors?.[0] || "La contrasena o el correo son incorrectos";
         setAuthError(errorMsg);
         return false;
       }
@@ -35,10 +35,9 @@ export function AuthProvider({ children }) {
       saveTokens(data.tokens);
       const userInfo = {
         id: data.user.id,
-        name: data.user.first_name || data.user.username,
-        username: data.user.username,
+        name: data.user.first_name || data.user.email,
         email: data.user.email,
-        avatar: (data.user.first_name || data.user.username)?.charAt(0)?.toUpperCase() || "U",
+        avatar: (data.user.first_name || data.user.email)?.charAt(0)?.toUpperCase() || "U",
         limite_diario_horas: data.user.limite_diario_horas,
         loggedInAt: new Date().toISOString(),
       };
@@ -65,7 +64,7 @@ export function AuthProvider({ children }) {
       if (!response.ok) {
         // Extraer primer error
         const errors = [];
-        if (data.username) errors.push(data.username[0] || data.username);
+
         if (data.email) errors.push(data.email[0] || data.email);
         if (data.password) errors.push(data.password[0] || data.password);
         if (data.password_confirm) errors.push(data.password_confirm[0] || data.password_confirm);
@@ -78,10 +77,9 @@ export function AuthProvider({ children }) {
       saveTokens(data.tokens);
       const userInfo = {
         id: data.user.id,
-        name: data.user.first_name || data.user.username,
-        username: data.user.username,
+        name: data.user.first_name || data.user.email,
         email: data.user.email,
-        avatar: (data.user.first_name || data.user.username)?.charAt(0)?.toUpperCase() || "U",
+        avatar: (data.user.first_name || data.user.email)?.charAt(0)?.toUpperCase() || "U",
         limite_diario_horas: data.user.limite_diario_horas,
         loggedInAt: new Date().toISOString(),
       };

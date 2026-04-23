@@ -14,7 +14,7 @@ import { BookOpen, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
 
 export default function LoginForm({ onSwitchToRegister }) {
   const { login, authError, clearError } = useAuth();
-  const [formData, setFormData] = useState({ username: "", password: "" });
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -27,12 +27,12 @@ export default function LoginForm({ onSwitchToRegister }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.username.trim() || !formData.password.trim()) {
+    if (!formData.email.trim() || !formData.password.trim()) {
       return;
     }
 
     setIsLoading(true);
-    await login(formData.username, formData.password);
+    await login(formData.email, formData.password);
     setIsLoading(false);
   };
 
@@ -65,15 +65,15 @@ export default function LoginForm({ onSwitchToRegister }) {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="login-username">Usuario</Label>
+            <Label htmlFor="login-email">Correo</Label>
             <Input
-              id="login-username"
-              name="username"
-              type="text"
-              placeholder="Tu nombre de usuario"
-              value={formData.username}
+              id="login-email"
+              name="email"
+              type="email"
+              placeholder="Tu correo electrónico"
+              value={formData.email}
               onChange={handleChange}
-              autoComplete="username"
+              autoComplete="email"
               className="h-11"
               required
               aria-required="true"
@@ -115,7 +115,7 @@ export default function LoginForm({ onSwitchToRegister }) {
             id="login-submit"
             type="submit"
             className="w-full h-11 text-base font-semibold cursor-pointer"
-            disabled={isLoading || !formData.username.trim() || !formData.password.trim()}
+            disabled={isLoading || !formData.email.trim() || !formData.password.trim()}
           >
             {isLoading ? (
               <span className="flex items-center gap-2">

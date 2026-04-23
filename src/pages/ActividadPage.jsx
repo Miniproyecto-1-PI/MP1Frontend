@@ -160,9 +160,11 @@ export default function ActividadPage() {
 
     subtareas.forEach((subtarea, index) => {
       if (!subtarea.titulo || subtarea.titulo.trim() === "") {
-        nuevosErrores.subtareas = `El nombre de la subtarea ${index + 1} no puede estar vacío`;
-        esValido = false;
-      } else if (!subtarea.fecha_objetivo) {
+        // Es opcional, la ignoramos al guardar
+        return;
+      }
+      
+      if (!subtarea.fecha_objetivo) {
         nuevosErrores.subtareas = `La fecha objetivo de la subtarea ${index + 1} es requerida`;
         esValido = false;
       } else if (
