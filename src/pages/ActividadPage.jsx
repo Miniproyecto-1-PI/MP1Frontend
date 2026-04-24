@@ -88,10 +88,10 @@ export default function ActividadPage() {
     fetchActividad();
   }, [id]);
 
-  // ── Verificar conflicto al cambiar fecha_objetivo de una subtarea ──
-  const verificarConflicto = async (index, nuevaFecha) => {
+  // ── Verificar conflicto al cambiar fecha_objetivo o horas de una subtarea ──
+  const verificarConflicto = async (index, nuevaFecha, horasOverride) => {
     const subtarea = subtareas[index];
-    const horas = parseFloat(subtarea.horas_estimadas);
+    const horas = horasOverride !== undefined ? parseFloat(horasOverride) : parseFloat(subtarea.horas_estimadas);
     if (!nuevaFecha || !horas || horas <= 0) return;
 
     try {
@@ -194,7 +194,33 @@ export default function ActividadPage() {
     setErrors({ ...errors, subtareas: "" });
   };
 
-  const eliminarSubtareaUI = (index) => {
+  const eliminarSubtareaUI = async (index) => {
+    const subtarea = subtareas[index];
+
+    // Si la subtarea ya existe en el backend (tiene id), eliminarla vía API
+    if (subtarea.id) {
+      if (!window.confirm(`¿Eliminar la subtarea "${subtarea.titulo || `#${index + 1}`}"? Esta acción no se puede deshacer.`)) {
+        return;
+      }
+      try {
+        const response = await apiFetch(`/subtareas/${subtarea.id}/`, {
+          method: "DELETE",
+        });
+        if (!response.ok && response.status !== 204) {
+          throw new Error("No se pudo eliminar la subtarea");
+        }
+        setMensaje({
+          type: "success",
+          text: `Subtarea "${subtarea.titulo}" eliminada correctamente.`,
+        });
+        setTimeout(() => setMensaje(null), 3000);
+      } catch (err) {
+        setError(err.message || "Error al eliminar la subtarea");
+        return; // No quitar de la UI si falló en el servidor
+      }
+    }
+
+    // Quitar de la UI
     setSubtareas(subtareas.filter((_, i) => i !== index));
     setErrors({ ...errors, subtareas: "" });
     if (conflictoSubtareaIndex === index) {
@@ -209,9 +235,15 @@ export default function ActividadPage() {
     setSubtareas(nuevasSubtareas);
     setErrors({ ...errors, subtareas: "" });
 
-    // Verificar conflicto al cambiar fecha_objetivo
+    // Verificar conflicto al cambiar fecha_objetivo o horas_estimadas
     if (campo === "fecha_objetivo" && valor) {
       verificarConflicto(index, valor);
+    }
+    if (campo === "horas_estimadas" && valor) {
+      const fecha = nuevasSubtareas[index].fecha_objetivo;
+      if (fecha) {
+        verificarConflicto(index, fecha, valor);
+      }
     }
   };
 
@@ -222,28 +254,36 @@ export default function ActividadPage() {
 
     switch (accion) {
       case "mover": {
-        // Limpiar la fecha para que el usuario elija otra
+        // Clear date so user can pick another
         const nuevasSubtareas = [...subtareas];
         nuevasSubtareas[idx].fecha_objetivo = "";
         setSubtareas(nuevasSubtareas);
         setConflicto(null);
         setConflictoSubtareaIndex(null);
+        setMensaje({
+          type: "info",
+          text: "Fecha limpiada — elige un día con menos carga.",
+        });
+        setTimeout(() => setMensaje(null), 3000);
         break;
       }
       case "reducir": {
-        // Reducir horas para que quepa en el límite
         const disponible = conflicto.limite - conflicto.horas_actuales;
         if (disponible > 0) {
           const nuevasSubtareas = [...subtareas];
           nuevasSubtareas[idx].horas_estimadas = disponible.toFixed(1);
           setSubtareas(nuevasSubtareas);
+          setMensaje({
+            type: "info",
+            text: `Horas ajustadas a ${disponible.toFixed(1)}h para caber en tu día.`,
+          });
+          setTimeout(() => setMensaje(null), 3000);
         }
         setConflicto(null);
         setConflictoSubtareaIndex(null);
         break;
       }
       case "posponer": {
-        // Mover al día siguiente
         const fechaActual = subtareas[idx].fecha_objetivo;
         if (fechaActual) {
           const siguiente = new Date(fechaActual + "T00:00:00");
@@ -252,17 +292,26 @@ export default function ActividadPage() {
           const nuevasSubtareas = [...subtareas];
           nuevasSubtareas[idx].fecha_objetivo = nuevaFecha;
           setSubtareas(nuevasSubtareas);
-          // Re-verificar conflicto en la nueva fecha
           setConflicto(null);
           setConflictoSubtareaIndex(null);
+          setMensaje({
+            type: "info",
+            text: `Subtarea movida al ${new Date(nuevaFecha + "T00:00:00").toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "short" })}. Verificando carga...`,
+          });
+          setTimeout(() => setMensaje(null), 3000);
+          // Re-verify in new date
           verificarConflicto(idx, nuevaFecha);
         }
         break;
       }
       case "forzar": {
-        // Ignorar conflicto y continuar
         setConflicto(null);
         setConflictoSubtareaIndex(null);
+        setMensaje({
+          type: "info",
+          text: "Conflicto ignorado — recuerda guardar los cambios.",
+        });
+        setTimeout(() => setMensaje(null), 3000);
         break;
       }
       default:
@@ -275,8 +324,44 @@ export default function ActividadPage() {
     setMensaje(null);
     setError(null);
 
+    // Bloquear si hay un conflicto activo sin resolver
+    if (conflicto && conflictoSubtareaIndex !== null) {
+      setError("Primero resuelve el conflicto de sobrecarga antes de guardar.");
+      return;
+    }
+
     if (!validarFormulario()) {
       return;
+    }
+
+    // Verificar conflictos de todas las subtareas antes de guardar
+    const subtareasValidas = subtareas.filter((s) => s.titulo.trim() !== "");
+    for (const sub of subtareasValidas) {
+      const horas = parseFloat(sub.horas_estimadas);
+      if (!sub.fecha_objetivo || !horas || horas <= 0) continue;
+
+      try {
+        const response = await apiFetch("/conflicto/verificar/", {
+          method: "POST",
+          body: JSON.stringify({
+            fecha: sub.fecha_objetivo,
+            horas_nuevas: horas,
+            subtarea_id: sub.id || undefined,
+          }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.hay_conflicto) {
+            const idx = subtareas.indexOf(sub);
+            setConflicto(data);
+            setConflictoSubtareaIndex(idx);
+            setError(`La subtarea "${sub.titulo}" genera sobrecarga el ${sub.fecha_objetivo}. Resuélvelo antes de guardar.`);
+            return;
+          }
+        }
+      } catch {
+        // continue if check fails
+      }
     }
 
     setSaving(true);
@@ -328,10 +413,12 @@ export default function ActividadPage() {
 
       setMensaje({
         type: "success",
-        text: `Actividad editada correctamente`,
+        text: "¡Cambios guardados! Tu planificación está actualizada.",
       });
       setSubtareas(data.subtareas || []);
       setErrors(initialErrors);
+      // Auto-dismiss success after 4s
+      setTimeout(() => setMensaje(null), 4000);
     } catch (err) {
       setError(err.message || "Error al editar la actividad");
     } finally {
@@ -390,73 +477,94 @@ export default function ActividadPage() {
 
       <div className="mt-6 max-w-2xl">
         {mensaje && (
-          <div className="mb-4 p-3 bg-green-500/10 border border-green-500/50 text-green-500 rounded-lg flex items-center gap-2">
+          <div className={`mb-4 p-3.5 rounded-xl flex items-center gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200 ${
+            mensaje.type === "success"
+              ? "bg-emerald-500/10 border border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
+              : "bg-blue-500/10 border border-blue-500/40 text-blue-700 dark:text-blue-400"
+          }`}>
             <CheckCircle className="h-4 w-4 shrink-0" />
-            <span>{mensaje.text}</span>
+            <span className="text-sm font-medium">{mensaje.text}</span>
           </div>
         )}
 
         {error && (
-          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/50 text-destructive rounded-lg flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{error}</span>
+          <div className="mb-4 p-3.5 bg-destructive/10 border border-destructive/40 text-destructive rounded-xl flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-medium">Algo salió mal</p>
+              <p className="opacity-80 mt-0.5">{error}</p>
+            </div>
           </div>
         )}
 
-        {/* ──────── CONFLICT MODAL ──────── */}
+        {/* ──────── CONFLICT PANEL ──────── */}
         {conflicto && (
           <div
-            className="mb-4 p-4 bg-amber-500/10 border-2 border-amber-500/50 rounded-xl"
+            className="mb-5 p-5 bg-amber-500/5 border-2 border-amber-500/40 rounded-2xl shadow-sm"
             role="alert"
             aria-live="assertive"
           >
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/20">
-                <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
+                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-amber-700 dark:text-amber-400 text-base">
-                  Conflicto de sobrecarga detectado
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-amber-700 dark:text-amber-300 text-base">
+                  ⚡ Ese día ya está bastante cargado
                 </h3>
-                <p className="text-sm text-amber-600 dark:text-amber-300 mt-1">
+                <p className="text-sm text-amber-600/90 dark:text-amber-300/80 mt-1 leading-relaxed">
                   {conflicto.mensaje}
                 </p>
-                <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <CalendarIcon className="h-3 w-3" />
-                    {conflicto.fecha}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {conflicto.horas_actuales}h actuales + {(conflicto.horas_con_nueva - conflicto.horas_actuales).toFixed(1)}h nueva
-                  </span>
+
+                {/* Visual capacity bar */}
+                <div className="mt-3 space-y-1.5">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Carga del día</span>
+                    <span className="font-medium text-amber-700 dark:text-amber-400">
+                      {conflicto.horas_con_nueva}h / {conflicto.limite}h
+                    </span>
+                  </div>
+                  <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-amber-500 transition-all duration-300"
+                      style={{ width: `${Math.min(100, conflicto.porcentaje_uso || 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground/70">
+                    Ya hay {conflicto.horas_actuales}h planificadas + {(conflicto.horas_con_nueva - conflicto.horas_actuales).toFixed(1)}h de esta subtarea
+                  </p>
                 </div>
 
-                {/* Alternativas */}
-                <div className="mt-4 space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    ¿Cómo quieres resolverlo?
+                {/* Resolution options */}
+                <div className="mt-4 space-y-2.5">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    ¿Qué prefieres hacer?
                   </p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {conflicto.alternativas?.map((alt) => (
                       <button
                         key={alt.accion}
                         type="button"
                         onClick={() => handleConflictAction(alt.accion)}
-                        className={`flex items-center gap-2 p-3 rounded-lg border text-left text-sm transition-colors hover:bg-accent cursor-pointer ${
+                        className={`flex items-start gap-2.5 p-3 rounded-xl border text-left text-sm transition-all duration-150 cursor-pointer group ${
                           alt.accion === "forzar"
-                            ? "border-destructive/30 text-destructive hover:bg-destructive/10"
-                            : "border-border hover:border-primary/30"
+                            ? "border-destructive/20 hover:border-destructive/40 hover:bg-destructive/5"
+                            : "border-border hover:border-primary/30 hover:bg-accent/50 hover:shadow-sm"
                         }`}
                       >
-                        <span className="flex-1">
-                          <span className="block font-medium">
-                            {alt.accion === "mover" && "📅 Mover a otro día"}
-                            {alt.accion === "reducir" && "⏱️ Reducir horas"}
-                            {alt.accion === "posponer" && "➡️ Posponer un día"}
-                            {alt.accion === "forzar" && "⚠️ Guardar igual"}
+                        <span className="text-lg leading-none mt-0.5">
+                          {alt.accion === "mover" && "📅"}
+                          {alt.accion === "reducir" && "⏱️"}
+                          {alt.accion === "posponer" && "➡️"}
+                          {alt.accion === "forzar" && "⚠️"}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className={`block font-medium text-sm ${
+                            alt.accion === "forzar" ? "text-destructive" : ""
+                          }`}>
+                            {alt.titulo || alt.descripcion}
                           </span>
-                          <span className="block text-xs text-muted-foreground mt-0.5">
+                          <span className="block text-xs text-muted-foreground mt-0.5 leading-snug">
                             {alt.descripcion}
                           </span>
                         </span>
@@ -471,8 +579,8 @@ export default function ActividadPage() {
                   setConflicto(null);
                   setConflictoSubtareaIndex(null);
                 }}
-                className="text-muted-foreground hover:text-foreground"
-                aria-label="Cerrar alerta de conflicto"
+                className="text-muted-foreground/50 hover:text-foreground transition-colors p-1 rounded-lg hover:bg-muted"
+                aria-label="Cerrar alerta"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -639,7 +747,7 @@ export default function ActividadPage() {
                     </select>
                   </div>
                   <div className="w-36 space-y-1">
-                    <Label className="text-xs">Fecha Objetivo</Label>
+                    <Label className="text-xs">Fecha objetivo</Label>
                     <Input
                       type="date"
                       value={subtarea.fecha_objetivo || ""}
@@ -650,6 +758,7 @@ export default function ActividadPage() {
                           e.target.value,
                         )
                       }
+                      title="¿Cuándo planeas trabajar en esto?"
                     />
                   </div>
                   <div className="w-20 space-y-1">
@@ -671,12 +780,13 @@ export default function ActividadPage() {
                   </div>
                   <Button
                     type="button"
-                    variant="destructive"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => eliminarSubtareaUI(index)}
-                    className="mb-[2px] px-3"
+                    className="mb-[2px] h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                     title="Eliminar subtarea"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
               ))}
@@ -686,17 +796,8 @@ export default function ActividadPage() {
             </CardContent>
           </Card>
 
-          <div className="mt-6 flex gap-4">
-            <Button
-              type="button"
-              variant="destructive"
-              className="flex-1"
-              disabled={saving}
-              onClick={eliminarActividad}
-            >
-              <Trash2 className="h-4 w-4 mr-2" /> Eliminar Actividad
-            </Button>
-            <Button type="submit" className="flex-1" disabled={saving}>
+          <div className="mt-6 space-y-3">
+            <Button type="submit" className="w-full" disabled={saving}>
               {saving ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -705,6 +806,16 @@ export default function ActividadPage() {
               ) : (
                 "Guardar cambios"
               )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+              disabled={saving}
+              onClick={eliminarActividad}
+            >
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Eliminar actividad completa
             </Button>
           </div>
         </form>

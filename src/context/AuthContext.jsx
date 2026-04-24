@@ -98,6 +98,15 @@ export function AuthProvider({ children }) {
     setAuthError(null);
   }, []);
 
+  const updateUser = useCallback((updates) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...updates };
+      localStorage.setItem("study-planner-user", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
   const clearError = useCallback(() => setAuthError(null), []);
 
   const value = {
@@ -106,6 +115,7 @@ export function AuthProvider({ children }) {
     login,
     registro,
     logout,
+    updateUser,
     authError,
     clearError,
   };
