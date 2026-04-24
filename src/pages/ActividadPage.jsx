@@ -54,6 +54,7 @@ export default function ActividadPage() {
   const [descripcion, setDescripcion] = useState("");
   const [tipo, setTipo] = useState("tarea");
   const [fechaEntrega, setFechaEntrega] = useState("");
+  const [completada, setCompletada] = useState(false);
   const [subtareas, setSubtareas] = useState([]);
 
   const [loading, setLoading] = useState(true);
@@ -78,6 +79,7 @@ export default function ActividadPage() {
         setDescripcion(data.descripcion || "");
         setTipo(data.tipo || "tarea");
         setFechaEntrega(data.fecha_entrega);
+        setCompletada(data.completada || false);
         setSubtareas(data.subtareas || []);
       } catch (err) {
         setError(err.message);
@@ -372,6 +374,7 @@ export default function ActividadPage() {
         descripcion: descripcion.trim(),
         tipo,
         fecha_entrega: fechaEntrega,
+        completada: completada,
         subtareas: subtareas
           .filter((s) => s.titulo.trim() !== "")
           .map((s) => ({
@@ -589,6 +592,44 @@ export default function ActividadPage() {
         )}
 
         <form onSubmit={handleSubmit} noValidate>
+          {/* Main activity completion toggle */}
+          <div className="mb-6">
+            <Card 
+              className={`border-2 transition-all duration-300 cursor-pointer ${
+                completada 
+                  ? "border-emerald-500/50 bg-emerald-500/5" 
+                  : "border-border/50 bg-card hover:border-primary/30"
+              }`}
+              onClick={() => setCompletada(!completada)}
+            >
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${
+                  completada ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"
+                }`}>
+                  <CheckCircle className="h-6 w-6" />
+                </div>
+                <div className="flex-1">
+                  <h3 className={`font-semibold text-lg transition-colors ${
+                    completada ? "text-emerald-700 dark:text-emerald-400" : ""
+                  }`}>
+                    {completada ? "¡Actividad completada!" : "Marcar actividad como completada"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {completada ? "Has finalizado esta actividad. ¡Buen trabajo!" : "Haz clic aquí cuando hayas terminado todo."}
+                  </p>
+                </div>
+                <div>
+                  <input
+                    type="checkbox"
+                    checked={completada}
+                    readOnly
+                    className="h-5 w-5 rounded border-gray-300 text-emerald-500 focus:ring-emerald-500 pointer-events-none"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
             <CardHeader>
               <CardTitle>Datos de la actividad</CardTitle>
@@ -698,10 +739,10 @@ export default function ActividadPage() {
                       : ""
                   }`}
                 >
-                  <div className="w-8 pb-3 flex justify-center">
+                  <div className="flex items-center self-center pt-5 px-1">
                     <input
                       type="checkbox"
-                      checked={subtarea.completada}
+                      checked={subtarea.completada || false}
                       onChange={(e) =>
                         actualizarSubtarea(
                           index,
@@ -709,7 +750,7 @@ export default function ActividadPage() {
                           e.target.checked,
                         )
                       }
-                      className="h-4 w-4 rounded border-gray-300 cursor-pointer"
+                      className="h-5 w-5 rounded border-gray-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer transition-transform hover:scale-110"
                       title="Marcar como completada"
                       aria-label={`Marcar "${subtarea.titulo}" como completada`}
                     />
@@ -725,7 +766,7 @@ export default function ActividadPage() {
                       }
                       className={
                         subtarea.completada
-                          ? "line-through text-muted-foreground"
+                          ? "line-through text-muted-foreground opacity-70"
                           : ""
                       }
                     />

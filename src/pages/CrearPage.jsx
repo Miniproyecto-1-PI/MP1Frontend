@@ -316,7 +316,6 @@ export default function CrearPage() {
           tipo: s.tipo,
           fecha_objetivo: s.fecha_objetivo,
           horas_estimadas: parseFloat(s.horas_estimadas),
-          completada: false,
         })),
       };
 

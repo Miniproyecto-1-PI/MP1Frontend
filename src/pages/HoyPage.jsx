@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Loader2,
   ArrowRight,
+  CheckCircle,
 } from "lucide-react";
 import { Link } from "react-router";
 import { apiFetch } from "@/lib/api";
@@ -40,6 +41,34 @@ export default function HoyPage() {
   useEffect(() => {
     obtenerDatos();
   }, []);
+
+  const toggleCompletada = async (subtarea) => {
+    try {
+      const response = await apiFetch(`/subtareas/${subtarea.id}/`, {
+        method: "PUT",
+        body: JSON.stringify({ completada: !subtarea.completada }),
+      });
+      if (response.ok) {
+        obtenerDatos();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const toggleActividad = async (actividad) => {
+    try {
+      const response = await apiFetch(`/actividades/${actividad.id}/`, {
+        method: "PUT",
+        body: JSON.stringify({ completada: !actividad.completada }),
+      });
+      if (response.ok) {
+        obtenerDatos();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const obtenerFechaActual = () => {
     const fecha = new Date();
@@ -191,9 +220,15 @@ export default function HoyPage() {
                 >
                   <CardContent className="py-3 px-4">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium truncate">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {subtarea.completada && (
+                          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                            <CheckCircle className="h-3 w-3" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-medium truncate ${subtarea.completada ? "line-through text-muted-foreground opacity-70" : ""}`}>
                             {subtarea.titulo}
                           </span>
                           {subtarea.tipo && subtarea.tipo !== "otro" && (
@@ -217,6 +252,7 @@ export default function HoyPage() {
                             {subtarea.actividad.titulo}
                           </span>
                         </div>
+                      </div>
                       </div>
                       <Button variant="ghost" size="sm" asChild>
                         <Link to={`/actividad/${subtarea.actividad.id}`}>
@@ -249,19 +285,17 @@ export default function HoyPage() {
                   <CardContent className="py-3 px-4">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <input
-                          type="checkbox"
-                          checked={subtarea.completada}
-                          readOnly
-                          className="h-4 w-4 rounded border-gray-300 accent-primary cursor-pointer"
-                          aria-label={`Marcar "${subtarea.titulo}" como completada`}
-                        />
+                        {subtarea.completada && (
+                          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                            <CheckCircle className="h-3 w-3" />
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span
                               className={`font-medium truncate ${
                                 subtarea.completada
-                                  ? "line-through text-muted-foreground"
+                                  ? "line-through text-muted-foreground opacity-70"
                                   : ""
                               }`}
                             >
@@ -314,7 +348,12 @@ export default function HoyPage() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium truncate">
+                          {actividad.completada && (
+                            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white mr-1">
+                              <CheckCircle className="h-3 w-3" />
+                            </div>
+                          )}
+                          <span className={`font-medium truncate ${actividad.completada ? "line-through text-muted-foreground" : ""}`}>
                             {actividad.titulo}
                           </span>
                           <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary-foreground border">
@@ -363,7 +402,12 @@ export default function HoyPage() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium truncate">
+                          {actividad.completada && (
+                            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white mr-1">
+                              <CheckCircle className="h-3 w-3" />
+                            </div>
+                          )}
+                          <span className={`font-medium truncate ${actividad.completada ? "line-through text-muted-foreground" : ""}`}>
                             {actividad.titulo}
                           </span>
                           <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30">
@@ -404,9 +448,15 @@ export default function HoyPage() {
                 >
                   <CardContent className="py-3 px-4">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium truncate">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {subtarea.completada && (
+                          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                            <CheckCircle className="h-3 w-3" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-medium truncate ${subtarea.completada ? "line-through text-muted-foreground opacity-70" : ""}`}>
                             {subtarea.titulo}
                           </span>
                           {subtarea.tipo && subtarea.tipo !== "otro" && (
@@ -424,6 +474,7 @@ export default function HoyPage() {
                             {subtarea.actividad.titulo}
                           </span>
                         </div>
+                      </div>
                       </div>
                       <Button variant="ghost" size="sm" asChild>
                         <Link to={`/actividad/${subtarea.actividad.id}`}>
