@@ -16,6 +16,7 @@ import {
   Clock,
   ArrowRight,
   X,
+  Pause,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
@@ -67,6 +68,20 @@ export default function ActividadPage() {
   const [conflicto, setConflicto] = useState(null);
   const [conflictoSubtareaIndex, setConflictoSubtareaIndex] = useState(null);
 
+  // ── Progress state (US-10) ──
+  const [progreso, setProgreso] = useState(null);
+
+  // ── Postpone note state (US-09) ──
+  const [postponeIndex, setPostponeIndex] = useState(null);
+  const [postponeNote, setPostponeNote] = useState("");
+
+  const fetchProgreso = async () => {
+    try {
+      const res = await apiFetch(`/actividades/${id}/progreso/`);
+      if (res.ok) setProgreso(await res.json());
+    } catch { /* silent */ }
+  };
+
   useEffect(() => {
     const fetchActividad = async () => {
       try {
@@ -88,7 +103,52 @@ export default function ActividadPage() {
       }
     };
     fetchActividad();
+    fetchProgreso();
   }, [id]);
+
+  // ── US-09: Marcar subtarea como hecha ──
+  const marcarHecha = async (subtarea, index) => {
+    try {
+      const res = await apiFetch(`/subtareas/${subtarea.id}/status/`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "done" }),
+      });
+      if (!res.ok) throw new Error();
+      const updated = await res.json();
+      const nuevas = [...subtareas];
+      nuevas[index] = { ...nuevas[index], ...updated };
+      setSubtareas(nuevas);
+      fetchProgreso();
+      setMensaje({ type: "success", text: "Subtarea marcada como hecha ✓" });
+      setTimeout(() => setMensaje(null), 3000);
+    } catch {
+      setMensaje({ type: "error", text: "No se pudo guardar. Intenta de nuevo" });
+      setTimeout(() => setMensaje(null), 3000);
+    }
+  };
+
+  // ── US-09: Marcar subtarea como pospuesta ──
+  const marcarPospuesta = async (subtarea, index) => {
+    try {
+      const res = await apiFetch(`/subtareas/${subtarea.id}/status/`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "postponed", note: postponeNote }),
+      });
+      if (!res.ok) throw new Error();
+      const updated = await res.json();
+      const nuevas = [...subtareas];
+      nuevas[index] = { ...nuevas[index], ...updated };
+      setSubtareas(nuevas);
+      fetchProgreso();
+      setPostponeIndex(null);
+      setPostponeNote("");
+      setMensaje({ type: "success", text: "Subtarea pospuesta" });
+      setTimeout(() => setMensaje(null), 3000);
+    } catch {
+      setMensaje({ type: "error", text: "No se pudo guardar. Intenta de nuevo" });
+      setTimeout(() => setMensaje(null), 3000);
+    }
+  };
 
   // ── Verificar conflicto al cambiar fecha_objetivo o horas de una subtarea ──
   const verificarConflicto = async (index, nuevaFecha, horasOverride) => {
@@ -718,117 +778,198 @@ export default function ActividadPage() {
           </Card>
 
           <Card className="mt-4">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Subtareas / Hitos</CardTitle>
-              <Button type="button" variant="outline" onClick={agregarSubtarea}>
-                + Agregar
-              </Button>
+            <CardHeader className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <CardTitle>Subtareas / Hitos</CardTitle>
+                <Button type="button" variant="outline" onClick={agregarSubtarea}>
+                  + Agregar
+                </Button>
+              </div>
+              {/* ── US-10: Progress bar ── */}
+              {progreso && progreso.total > 0 && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {progreso.done} de {progreso.total} completadas
+                    </span>
+                    <span className="font-semibold text-primary">{progreso.percentage}%</span>
+                  </div>
+                  <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                      style={{ width: `${progreso.percentage}%` }}
+                    />
+                  </div>
+                  {progreso.postponed > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {progreso.postponed} pospuesta{progreso.postponed !== 1 ? "s" : ""}
+                    </p>
+                  )}
+                </div>
+              )}
             </CardHeader>
             <CardContent className="space-y-3">
               {subtareas.length === 0 && (
-                <p className="text-muted-foreground text-sm">
-                  No hay subtareas agregadas
+                <p className="text-muted-foreground text-sm text-center py-4">
+                  Aún no hay subtareas registradas
                 </p>
               )}
               {subtareas.map((subtarea, index) => (
                 <div
                   key={subtarea.id || index}
-                  className={`flex gap-2 items-end flex-wrap p-2 rounded-lg transition-colors ${
-                    conflictoSubtareaIndex === index
-                      ? "bg-amber-500/10 border border-amber-500/30"
-                      : ""
+                  className={`p-3 rounded-lg transition-colors border ${
+                    subtarea.estado === "hecha"
+                      ? "bg-emerald-500/5 border-emerald-500/30"
+                      : subtarea.estado === "pospuesta"
+                        ? "bg-muted/50 border-border/50"
+                        : conflictoSubtareaIndex === index
+                          ? "bg-amber-500/10 border-amber-500/30"
+                          : "border-transparent"
                   }`}
                 >
-                  <div className="flex items-center self-center pt-5 px-1">
-                    <input
-                      type="checkbox"
-                      checked={subtarea.completada || false}
-                      onChange={(e) =>
-                        actualizarSubtarea(
-                          index,
-                          "completada",
-                          e.target.checked,
-                        )
-                      }
-                      className="h-5 w-5 rounded border-gray-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer transition-transform hover:scale-110"
-                      title="Marcar como completada"
-                      aria-label={`Marcar "${subtarea.titulo}" como completada`}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-[120px] space-y-1">
-                    <Label className="text-xs">Nombre</Label>
-                    <Input
-                      type="text"
-                      placeholder={`Subtarea ${index + 1}`}
-                      value={subtarea.titulo}
-                      onChange={(e) =>
-                        actualizarSubtarea(index, "titulo", e.target.value)
-                      }
-                      className={
-                        subtarea.completada
-                          ? "line-through text-muted-foreground opacity-70"
-                          : ""
-                      }
-                    />
-                  </div>
-                  <div className="w-32 space-y-1">
-                    <Label className="text-xs">Tipo</Label>
-                    <select
-                      value={subtarea.tipo || "otro"}
-                      onChange={(e) =>
-                        actualizarSubtarea(index, "tipo", e.target.value)
-                      }
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  {/* Status badge */}
+                  {subtarea.estado && subtarea.estado !== "pendiente" && (
+                    <div className={`flex items-center gap-1.5 mb-2 text-xs font-medium ${
+                      subtarea.estado === "hecha" ? "text-emerald-600" : "text-muted-foreground"
+                    }`}>
+                      {subtarea.estado === "hecha" ? (
+                        <><CheckCircle className="h-3.5 w-3.5" /> Hecha</>
+                      ) : (
+                        <><Pause className="h-3.5 w-3.5" /> Pospuesta</>
+                      )}
+                      {subtarea.nota && (
+                        <span className="ml-2 text-muted-foreground font-normal italic">— {subtarea.nota}</span>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex gap-2 items-end flex-wrap">
+                    <div className="flex-1 min-w-[120px] space-y-1">
+                      <Label className="text-xs">Nombre</Label>
+                      <Input
+                        type="text"
+                        placeholder={`Subtarea ${index + 1}`}
+                        value={subtarea.titulo}
+                        onChange={(e) =>
+                          actualizarSubtarea(index, "titulo", e.target.value)
+                        }
+                        className={
+                          subtarea.estado === "hecha"
+                            ? "line-through text-muted-foreground opacity-70"
+                            : ""
+                        }
+                      />
+                    </div>
+                    <div className="w-32 space-y-1">
+                      <Label className="text-xs">Tipo</Label>
+                      <select
+                        value={subtarea.tipo || "otro"}
+                        onChange={(e) =>
+                          actualizarSubtarea(index, "tipo", e.target.value)
+                        }
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        {TIPOS_SUBTAREA.map((t) => (
+                          <option key={t.value} value={t.value}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="w-36 space-y-1">
+                      <Label className="text-xs">Fecha objetivo</Label>
+                      <Input
+                        type="date"
+                        value={subtarea.fecha_objetivo || ""}
+                        onChange={(e) =>
+                          actualizarSubtarea(
+                            index,
+                            "fecha_objetivo",
+                            e.target.value,
+                          )
+                        }
+                        title="¿Cuándo planeas trabajar en esto?"
+                      />
+                    </div>
+                    <div className="w-20 space-y-1">
+                      <Label className="text-xs">Horas</Label>
+                      <Input
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        placeholder="0.0"
+                        value={subtarea.horas_estimadas || ""}
+                        onChange={(e) =>
+                          actualizarSubtarea(
+                            index,
+                            "horas_estimadas",
+                            e.target.value,
+                          )
+                        }
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => eliminarSubtareaUI(index)}
+                      className="mb-[2px] h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      title="Eliminar subtarea"
                     >
-                      {TIPOS_SUBTAREA.map((t) => (
-                        <option key={t.value} value={t.value}>
-                          {t.label}
-                        </option>
-                      ))}
-                    </select>
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <div className="w-36 space-y-1">
-                    <Label className="text-xs">Fecha objetivo</Label>
-                    <Input
-                      type="date"
-                      value={subtarea.fecha_objetivo || ""}
-                      onChange={(e) =>
-                        actualizarSubtarea(
-                          index,
-                          "fecha_objetivo",
-                          e.target.value,
-                        )
-                      }
-                      title="¿Cuándo planeas trabajar en esto?"
-                    />
-                  </div>
-                  <div className="w-20 space-y-1">
-                    <Label className="text-xs">Horas</Label>
-                    <Input
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      placeholder="0.0"
-                      value={subtarea.horas_estimadas || ""}
-                      onChange={(e) =>
-                        actualizarSubtarea(
-                          index,
-                          "horas_estimadas",
-                          e.target.value,
-                        )
-                      }
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => eliminarSubtareaUI(index)}
-                    className="mb-[2px] h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    title="Eliminar subtarea"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                  {/* ── US-09: Action buttons ── */}
+                  {subtarea.id && subtarea.estado !== "hecha" && (
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-xs"
+                        onClick={() => marcarHecha(subtarea, index)}
+                      >
+                        <CheckCircle className="h-3.5 w-3.5 mr-1" /> Hecha
+                      </Button>
+                      {postponeIndex === index ? (
+                        <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                          <Input
+                            type="text"
+                            placeholder="Nota opcional..."
+                            value={postponeNote}
+                            onChange={(e) => setPostponeNote(e.target.value)}
+                            className="h-8 text-xs flex-1"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="h-8 text-xs"
+                            onClick={() => marcarPospuesta(subtarea, index)}
+                          >
+                            Confirmar
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 text-xs"
+                            onClick={() => { setPostponeIndex(null); setPostponeNote(""); }}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs text-muted-foreground"
+                          onClick={() => setPostponeIndex(index)}
+                        >
+                          <Pause className="h-3.5 w-3.5 mr-1" /> Posponer
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
               {errors.subtareas && (

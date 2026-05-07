@@ -12,6 +12,7 @@ import {
   Loader2,
   ArrowRight,
   CheckCircle,
+  Pause,
 } from "lucide-react";
 import { Link } from "react-router";
 import { apiFetch } from "@/lib/api";
@@ -44,9 +45,9 @@ export default function HoyPage() {
 
   const toggleCompletada = async (subtarea) => {
     try {
-      const response = await apiFetch(`/subtareas/${subtarea.id}/`, {
-        method: "PUT",
-        body: JSON.stringify({ completada: !subtarea.completada }),
+      const response = await apiFetch(`/subtareas/${subtarea.id}/status/`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: subtarea.estado === "hecha" ? "postponed" : "done" }),
       });
       if (response.ok) {
         obtenerDatos();
@@ -231,6 +232,15 @@ export default function HoyPage() {
                             <span className={`font-medium truncate ${subtarea.completada ? "line-through text-muted-foreground opacity-70" : ""}`}>
                             {subtarea.titulo}
                           </span>
+                          {subtarea.estado && subtarea.estado !== "pendiente" && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                              subtarea.estado === "hecha"
+                                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                                : "bg-muted text-muted-foreground border border-border/50"
+                            }`}>
+                              {subtarea.estado === "hecha" ? <><CheckCircle className="h-3 w-3" /> Hecha</> : <><Pause className="h-3 w-3" /> Pospuesta</>}
+                            </span>
+                          )}
                           {subtarea.tipo && subtarea.tipo !== "otro" && (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/20">
                               {subtarea.tipo}
@@ -301,6 +311,15 @@ export default function HoyPage() {
                             >
                               {subtarea.titulo}
                             </span>
+                            {subtarea.estado && subtarea.estado !== "pendiente" && (
+                              <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                                subtarea.estado === "hecha"
+                                  ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                                  : "bg-muted text-muted-foreground border border-border/50"
+                              }`}>
+                                {subtarea.estado === "hecha" ? <><CheckCircle className="h-3 w-3" /> Hecha</> : <><Pause className="h-3 w-3" /> Pospuesta</>}
+                              </span>
+                            )}
                             {subtarea.tipo && subtarea.tipo !== "otro" && (
                               <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                                 {subtarea.tipo}
@@ -459,6 +478,15 @@ export default function HoyPage() {
                             <span className={`font-medium truncate ${subtarea.completada ? "line-through text-muted-foreground opacity-70" : ""}`}>
                             {subtarea.titulo}
                           </span>
+                          {subtarea.estado && subtarea.estado !== "pendiente" && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                              subtarea.estado === "hecha"
+                                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                                : "bg-muted text-muted-foreground border border-border/50"
+                            }`}>
+                              {subtarea.estado === "hecha" ? <><CheckCircle className="h-3 w-3" /> Hecha</> : <><Pause className="h-3 w-3" /> Pospuesta</>}
+                            </span>
+                          )}
                           {subtarea.tipo && subtarea.tipo !== "otro" && (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground border">
                               {subtarea.tipo}
