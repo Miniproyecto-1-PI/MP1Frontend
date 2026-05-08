@@ -13,6 +13,7 @@ import {
   ArrowRight,
   CheckCircle,
   Pause,
+  CircleDashed
 } from "lucide-react";
 import { Link } from "react-router";
 import { apiFetch } from "@/lib/api";
@@ -43,25 +44,11 @@ export default function HoyPage() {
     obtenerDatos();
   }, []);
 
-  const toggleCompletada = async (subtarea) => {
+  const updateSubtaskStatus = async (subtarea, newStatus) => {
     try {
       const response = await apiFetch(`/subtareas/${subtarea.id}/status/`, {
         method: "PATCH",
-        body: JSON.stringify({ status: subtarea.estado === "hecha" ? "postponed" : "done" }),
-      });
-      if (response.ok) {
-        obtenerDatos();
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const toggleActividad = async (actividad) => {
-    try {
-      const response = await apiFetch(`/actividades/${actividad.id}/`, {
-        method: "PUT",
-        body: JSON.stringify({ completada: !actividad.completada }),
+        body: JSON.stringify({ status: newStatus }),
       });
       if (response.ok) {
         obtenerDatos();
@@ -105,6 +92,79 @@ export default function HoyPage() {
     (data?.actividades_hoy?.length || 0) +
     (data?.actividades_sin_planificar?.length || 0);
 
+  // Kanban logic
+  const tareasDelDia = data?.todas || [];
+  // Filter out duplicates just in case
+  const tareasUnicas = Array.from(new Map(tareasDelDia.map(t => [t.id, t])).values());
+
+  const pendientes = tareasUnicas.filter(t => !t.estado || t.estado === "pendiente");
+  const pospuestas = tareasUnicas.filter(t => t.estado === "pospuesta");
+  const hechas = tareasUnicas.filter(t => t.estado === "hecha");
+
+  // Kanban card component
+  const KanbanCard = ({ subtarea, isVencida }) => (
+    <Card className={`mb-3 hover:shadow-md transition-shadow relative overflow-hidden ${isVencida ? 'border-destructive/40 bg-destructive/5' : 'border-border'}`}>
+      {isVencida && (
+        <div className="absolute top-0 left-0 w-1 h-full bg-destructive" />
+      )}
+      <CardContent className="p-4">
+        <div className="flex flex-col gap-2">
+          <div className="flex justify-between items-start gap-2">
+            <span className={`font-medium text-sm ${subtarea.completada ? "line-through text-muted-foreground opacity-70" : ""}`}>
+              {subtarea.titulo}
+            </span>
+            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 -mt-1 -mr-1" asChild>
+              <Link to={`/actividad/${subtarea.actividad.id}`}>
+                <ArrowRight className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+              </Link>
+            </Button>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-2">
+            {subtarea.tipo && subtarea.tipo !== "otro" && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground border uppercase font-medium">
+                {subtarea.tipo}
+              </span>
+            )}
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <Clock className="h-3 w-3" /> {subtarea.horas_estimadas}h
+            </span>
+          </div>
+
+          <div className="text-xs text-muted-foreground truncate mt-1 border-b pb-2">
+            Proyecto: <span className="font-medium text-foreground">{subtarea.actividad.titulo}</span>
+          </div>
+          
+          {isVencida && (
+            <div className="text-[11px] text-destructive font-medium mt-1 flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              {diasAtraso(subtarea.fecha_objetivo)} día(s) de atraso
+            </div>
+          )}
+
+          {/* Acciones */}
+          <div className="flex items-center gap-1.5 mt-2">
+            {subtarea.estado !== 'pendiente' && (
+              <Button variant="outline" size="sm" className="h-7 text-xs flex-1" onClick={() => updateSubtaskStatus(subtarea, 'pending')}>
+                <CircleDashed className="h-3 w-3 mr-1" /> Mover a Pendiente
+              </Button>
+            )}
+            {subtarea.estado !== 'pospuesta' && (
+              <Button variant="outline" size="sm" className="h-7 text-xs flex-1 text-amber-600 border-amber-200 hover:bg-amber-50" onClick={() => updateSubtaskStatus(subtarea, 'postponed')}>
+                <Pause className="h-3 w-3 mr-1" /> Posponer
+              </Button>
+            )}
+            {subtarea.estado !== 'hecha' && (
+              <Button variant="default" size="sm" className="h-7 text-xs flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => updateSubtaskStatus(subtarea, 'done')}>
+                <CheckCircle className="h-3 w-3 mr-1" /> Hecha
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   // ────────────────────── Loading ──────────────────────
   if (loading) {
     return (
@@ -123,29 +183,14 @@ export default function HoyPage() {
   }
 
   return (
-    <div>
+    <div className="h-full flex flex-col">
       <PageHeader
         title="Hoy"
         description={obtenerFechaActual()}
         icon={Calendar}
       />
 
-      {/* Regla de priorización oculta */}
-      {false && (
-        <div className="mt-4 p-3.5 bg-muted/30 border border-border/50 rounded-lg text-sm text-muted-foreground leading-relaxed">
-          <p className="font-semibold text-foreground mb-1 flex items-center gap-2">
-            <Clock className="h-4 w-4 text-primary" /> Regla de priorización:
-          </p>
-          <ul className="list-disc list-inside space-y-0.5 ml-1 marker:text-muted-foreground/50">
-            <li><strong>Vencidas:</strong> Más antiguas primero, luego por mayor carga horaria.</li>
-            <li><strong>Hoy:</strong> Mayor carga horaria primero.</li>
-            <li><strong>Próximas:</strong> Fecha más cercana, luego por mayor carga horaria.</li>
-          </ul>
-          <p className="mt-1.5 text-xs opacity-70 italic">* En caso de empate, se ordenan alfabéticamente por título.</p>
-        </div>
-      )}
-
-      <div className="mt-6">
+      <div className="mt-6 flex-1 flex flex-col">
         {/* Error */}
         {error && (
           <div className="mb-4 p-3 bg-destructive/10 border border-destructive/50 text-destructive rounded-lg flex items-center gap-2">
@@ -163,7 +208,7 @@ export default function HoyPage() {
 
         {/* Horas planificadas hoy */}
         {data && !error && (
-          <div className="mb-6 p-4 bg-card border border-border rounded-xl flex items-center justify-between">
+          <div className="mb-6 p-4 bg-card border border-border rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                 <Clock className="h-5 w-5 text-primary" />
@@ -177,344 +222,213 @@ export default function HoyPage() {
                 </p>
               </div>
             </div>
-            <div className="text-right text-sm text-muted-foreground">
-              <p>
-                {totalItems} subtarea{totalItems !== 1 ? "s" : ""} pendiente
-                {totalItems !== 1 ? "s" : ""}
-              </p>
+            <div className="flex flex-wrap gap-2">
+              <div className="px-3 py-1 bg-muted rounded-full text-xs font-medium border text-muted-foreground">
+                {pendientes.length} Pendientes
+              </div>
+              <div className="px-3 py-1 bg-amber-500/10 border-amber-500/20 border rounded-full text-xs font-medium text-amber-700 dark:text-amber-400">
+                {pospuestas.length} Pospuestas
+              </div>
+              <div className="px-3 py-1 bg-emerald-500/10 border-emerald-500/20 border rounded-full text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                {hechas.length} Hechas
+              </div>
             </div>
           </div>
         )}
 
-        {/* Estado vacío */}
-        {!error && totalItems === 0 && !loading && (
-          <div className="text-center py-16">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted/50 mb-4">
-              <CheckCircle2 className="h-8 w-8 text-muted-foreground" />
+        {/* KANBAN BOARD */}
+        {data && !error && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start">
+            
+            {/* Columna Pendientes */}
+            <div className="bg-muted/30 rounded-xl p-4 border border-border/50 min-h-[400px] flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <CircleDashed className="h-5 w-5 text-blue-500" />
+                  <h3 className="font-semibold text-sm uppercase tracking-wider text-foreground">Pendientes</h3>
+                </div>
+                <span className="bg-blue-500/10 text-blue-600 border border-blue-500/20 px-2 py-0.5 rounded-full text-xs font-bold">
+                  {pendientes.length}
+                </span>
+              </div>
+              
+              <div className="flex-1">
+                {pendientes.length === 0 ? (
+                  <div className="h-32 flex items-center justify-center text-muted-foreground text-sm border-2 border-dashed rounded-xl">
+                    No hay tareas pendientes
+                  </div>
+                ) : (
+                  pendientes.map(subtarea => (
+                    <KanbanCard 
+                      key={`k-${subtarea.id}`} 
+                      subtarea={subtarea} 
+                      isVencida={subtarea.fecha_objetivo && new Date(subtarea.fecha_objetivo + "T00:00:00") < new Date(new Date().setHours(0,0,0,0))} 
+                    />
+                  ))
+                )}
+              </div>
             </div>
-            <p className="text-muted-foreground text-lg font-medium">
-              No hay tareas pendientes
-            </p>
-            <p className="text-muted-foreground text-sm mt-1">
-              ¡Estás al día! Crea una nueva actividad para comenzar.
-            </p>
-            <Button variant="outline" className="mt-4" asChild>
-              <Link to="/crear">Crear actividad</Link>
-            </Button>
+
+            {/* Columna Pospuestas */}
+            <div className="bg-amber-500/5 rounded-xl p-4 border border-amber-500/20 min-h-[400px] flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Pause className="h-5 w-5 text-amber-500" />
+                  <h3 className="font-semibold text-sm uppercase tracking-wider text-amber-700 dark:text-amber-400">Pospuestas</h3>
+                </div>
+                <span className="bg-amber-500/10 text-amber-600 border border-amber-500/20 px-2 py-0.5 rounded-full text-xs font-bold">
+                  {pospuestas.length}
+                </span>
+              </div>
+              
+              <div className="flex-1">
+                {pospuestas.length === 0 ? (
+                  <div className="h-32 flex items-center justify-center text-amber-600/50 text-sm border-2 border-dashed border-amber-500/20 rounded-xl">
+                    Nada pospuesto hoy
+                  </div>
+                ) : (
+                  pospuestas.map(subtarea => (
+                    <KanbanCard key={`k-${subtarea.id}`} subtarea={subtarea} isVencida={false} />
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Columna Hechas */}
+            <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/20 min-h-[400px] flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                  <h3 className="font-semibold text-sm uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Hechas</h3>
+                </div>
+                <span className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 px-2 py-0.5 rounded-full text-xs font-bold">
+                  {hechas.length}
+                </span>
+              </div>
+              
+              <div className="flex-1">
+                {hechas.length === 0 ? (
+                  <div className="h-32 flex items-center justify-center text-emerald-600/50 text-sm border-2 border-dashed border-emerald-500/20 rounded-xl">
+                    Aún no hay tareas hechas
+                  </div>
+                ) : (
+                  hechas.map(subtarea => (
+                    <KanbanCard key={`k-${subtarea.id}`} subtarea={subtarea} isVencida={false} />
+                  ))
+                )}
+              </div>
+            </div>
+
           </div>
         )}
 
-        {/* ──────── VENCIDAS ──────── */}
-        {data?.vencidas?.length > 0 && (
-          <section className="mb-6" aria-label="Subtareas vencidas">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-              <h2 className="text-sm font-semibold text-destructive uppercase tracking-wide">
-                Vencidas ({data.vencidas.length})
-              </h2>
-            </div>
-            <div className="space-y-2">
-              {data.vencidas.map((subtarea) => (
-                <Card
-                  key={`v-${subtarea.id}`}
-                  className="border-destructive/30 bg-destructive/5 hover:shadow-md transition-shadow"
-                >
-                  <CardContent className="py-3 px-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {subtarea.completada && (
-                          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-                            <CheckCircle className="h-3 w-3" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className={`font-medium truncate ${subtarea.completada ? "line-through text-muted-foreground opacity-70" : ""}`}>
-                            {subtarea.titulo}
-                          </span>
-                          {subtarea.estado && subtarea.estado !== "pendiente" && (
-                            <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                              subtarea.estado === "hecha"
-                                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-                                : "bg-muted text-muted-foreground border border-border/50"
-                            }`}>
-                              {subtarea.estado === "hecha" ? <><CheckCircle className="h-3 w-3" /> Hecha</> : <><Pause className="h-3 w-3" /> Pospuesta</>}
-                            </span>
-                          )}
-                          {subtarea.tipo && subtarea.tipo !== "otro" && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/20">
-                              {subtarea.tipo}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                          <span className="text-destructive font-medium">
-                            {diasAtraso(subtarea.fecha_objetivo)} día
-                            {diasAtraso(subtarea.fecha_objetivo) !== 1
-                              ? "s"
-                              : ""}{" "}
-                            de atraso
-                          </span>
-                          <span>·</span>
-                          <span>{subtarea.horas_estimadas}h estimadas</span>
-                          <span>·</span>
-                          <span className="truncate">
-                            {subtarea.actividad.titulo}
-                          </span>
-                        </div>
-                      </div>
-                      </div>
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link to={`/actividad/${subtarea.actividad.id}`}>
-                          <ArrowRight className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ──────── HOY ──────── */}
-        {data?.hoy?.length > 0 && (
-          <section className="mb-6" aria-label="Subtareas de hoy">
-            <div className="flex items-center gap-2 mb-3">
-              <Calendar className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold text-primary uppercase tracking-wide">
-                Hoy ({data.hoy.length})
-              </h2>
-            </div>
-            <div className="space-y-2">
-              {data.hoy.map((subtarea) => (
-                <Card
-                  key={`h-${subtarea.id}`}
-                  className="border-primary/20 hover:shadow-md transition-shadow"
-                >
-                  <CardContent className="py-3 px-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {subtarea.completada && (
-                          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-                            <CheckCircle className="h-3 w-3" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`font-medium truncate ${
-                                subtarea.completada
-                                  ? "line-through text-muted-foreground opacity-70"
-                                  : ""
-                              }`}
-                            >
-                              {subtarea.titulo}
-                            </span>
-                            {subtarea.estado && subtarea.estado !== "pendiente" && (
-                              <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                                subtarea.estado === "hecha"
-                                  ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-                                  : "bg-muted text-muted-foreground border border-border/50"
-                              }`}>
-                                {subtarea.estado === "hecha" ? <><CheckCircle className="h-3 w-3" /> Hecha</> : <><Pause className="h-3 w-3" /> Pospuesta</>}
+        {/* Otras secciones inferiores */}
+        {data && (
+          <div className="grid grid-cols-1 gap-6 pt-4 border-t border-border/50">
+            {/* ──────── ACTIVIDADES (ENTREGAS HOY) ──────── */}
+            {data?.actividades_hoy?.length > 0 && (
+              <section aria-label="Entregas de hoy">
+                <div className="flex items-center gap-2 mb-3">
+                  <Calendar className="h-4 w-4 text-primary" />
+                  <h2 className="text-sm font-semibold text-primary uppercase tracking-wide">
+                    Entregas de Actividades Hoy ({data.actividades_hoy.length})
+                  </h2>
+                </div>
+                <div className="space-y-2">
+                  {data.actividades_hoy.map((actividad) => (
+                    <Card
+                      key={`a-${actividad.id}`}
+                      className="border-primary/20 hover:shadow-md transition-shadow bg-primary/5"
+                    >
+                      <CardContent className="py-3 px-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              {actividad.completada && (
+                                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white mr-1">
+                                  <CheckCircle className="h-3 w-3" />
+                                </div>
+                              )}
+                              <span className={`font-medium truncate ${actividad.completada ? "line-through text-muted-foreground" : ""}`}>
+                                {actividad.titulo}
                               </span>
-                            )}
-                            {subtarea.tipo && subtarea.tipo !== "otro" && (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                                {subtarea.tipo}
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary-foreground border">
+                                Actividad
                               </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                            <span>{subtarea.horas_estimadas}h estimadas</span>
-                            <span>·</span>
-                            <span className="truncate">
-                              {subtarea.actividad.titulo}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link to={`/actividad/${subtarea.actividad.id}`}>
-                          <ArrowRight className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ──────── ACTIVIDADES (ENTREGAS HOY) ──────── */}
-        {data?.actividades_hoy?.length > 0 && (
-          <section className="mb-6" aria-label="Entregas de hoy">
-            <div className="flex items-center gap-2 mb-3">
-              <Calendar className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold text-primary uppercase tracking-wide">
-                Entregas de Actividades Hoy ({data.actividades_hoy.length})
-              </h2>
-            </div>
-            <div className="space-y-2">
-              {data.actividades_hoy.map((actividad) => (
-                <Card
-                  key={`a-${actividad.id}`}
-                  className="border-primary/20 hover:shadow-md transition-shadow bg-primary/5"
-                >
-                  <CardContent className="py-3 px-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          {actividad.completada && (
-                            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white mr-1">
-                              <CheckCircle className="h-3 w-3" />
                             </div>
-                          )}
-                          <span className={`font-medium truncate ${actividad.completada ? "line-through text-muted-foreground" : ""}`}>
-                            {actividad.titulo}
-                          </span>
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary-foreground border">
-                            Actividad
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                          <span className="text-primary font-medium">Se entrega hoy</span>
-                          {(!actividad.subtareas || actividad.subtareas.length === 0) && (
-                            <>
-                              <span>·</span>
-                              <span className="text-amber-600 font-medium">Sin subtareas planificadas</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link to={`/actividad/${actividad.id}`}>
-                          <ArrowRight className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ──────── ACTIVIDADES SIN PLANIFICAR ──────── */}
-        {data?.actividades_sin_planificar?.length > 0 && (
-          <section className="mb-6" aria-label="Actividades sin planificar">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertCircle className="h-4 w-4 text-amber-500" />
-              <h2 className="text-sm font-semibold text-amber-500 uppercase tracking-wide">
-                Sin planificar ({data.actividades_sin_planificar.length})
-              </h2>
-            </div>
-            <div className="space-y-2">
-              {data.actividades_sin_planificar.map((actividad) => (
-                <Card
-                  key={`ap-${actividad.id}`}
-                  className="border-amber-500/20 hover:shadow-md transition-shadow bg-amber-500/5"
-                >
-                  <CardContent className="py-3 px-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          {actividad.completada && (
-                            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white mr-1">
-                              <CheckCircle className="h-3 w-3" />
+                            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                              <span className="text-primary font-medium">Se entrega hoy</span>
+                              {(!actividad.subtareas || actividad.subtareas.length === 0) && (
+                                <>
+                                  <span>·</span>
+                                  <span className="text-amber-600 font-medium">Sin subtareas planificadas</span>
+                                </>
+                              )}
                             </div>
-                          )}
-                          <span className={`font-medium truncate ${actividad.completada ? "line-through text-muted-foreground" : ""}`}>
-                            {actividad.titulo}
-                          </span>
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30">
-                            Falta planificar
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                          <span>Entrega: {formatFecha(actividad.fecha_entrega)}</span>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link to={`/actividad/${actividad.id}`}>
-                          <ArrowRight className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ──────── PRÓXIMAS ──────── */}
-        {data?.proximas?.length > 0 && (
-          <section className="mb-6" aria-label="Subtareas próximas">
-            <div className="flex items-center gap-2 mb-3">
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Próximas ({data.proximas.length})
-              </h2>
-            </div>
-            <div className="space-y-2">
-              {data.proximas.map((subtarea) => (
-                <Card
-                  key={`p-${subtarea.id}`}
-                  className="border-border/50 opacity-80 hover:opacity-100 hover:shadow-md transition-all"
-                >
-                  <CardContent className="py-3 px-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {subtarea.completada && (
-                          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-                            <CheckCircle className="h-3 w-3" />
                           </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className={`font-medium truncate ${subtarea.completada ? "line-through text-muted-foreground opacity-70" : ""}`}>
-                            {subtarea.titulo}
-                          </span>
-                          {subtarea.estado && subtarea.estado !== "pendiente" && (
-                            <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                              subtarea.estado === "hecha"
-                                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-                                : "bg-muted text-muted-foreground border border-border/50"
-                            }`}>
-                              {subtarea.estado === "hecha" ? <><CheckCircle className="h-3 w-3" /> Hecha</> : <><Pause className="h-3 w-3" /> Pospuesta</>}
-                            </span>
-                          )}
-                          {subtarea.tipo && subtarea.tipo !== "otro" && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground border">
-                              {subtarea.tipo}
-                            </span>
-                          )}
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link to={`/actividad/${actividad.id}`}>
+                              <ArrowRight className="h-4 w-4" />
+                            </Link>
+                          </Button>
                         </div>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                          <span>{formatFecha(subtarea.fecha_objetivo)}</span>
-                          <span>·</span>
-                          <span>{subtarea.horas_estimadas}h estimadas</span>
-                          <span>·</span>
-                          <span className="truncate">
-                            {subtarea.actividad.titulo}
-                          </span>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* ──────── ACTIVIDADES SIN PLANIFICAR ──────── */}
+            {data?.actividades_sin_planificar?.length > 0 && (
+              <section aria-label="Actividades sin planificar">
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertCircle className="h-4 w-4 text-amber-500" />
+                  <h2 className="text-sm font-semibold text-amber-500 uppercase tracking-wide">
+                    Sin planificar ({data.actividades_sin_planificar.length})
+                  </h2>
+                </div>
+                <div className="space-y-2">
+                  {data.actividades_sin_planificar.map((actividad) => (
+                    <Card
+                      key={`ap-${actividad.id}`}
+                      className="border-amber-500/20 hover:shadow-md transition-shadow bg-amber-500/5"
+                    >
+                      <CardContent className="py-3 px-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              {actividad.completada && (
+                                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white mr-1">
+                                  <CheckCircle className="h-3 w-3" />
+                                </div>
+                              )}
+                              <span className={`font-medium truncate ${actividad.completada ? "line-through text-muted-foreground" : ""}`}>
+                                {actividad.titulo}
+                              </span>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                                Falta planificar
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                              <span>Entrega: {formatFecha(actividad.fecha_entrega)}</span>
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link to={`/actividad/${actividad.id}`}>
+                              <ArrowRight className="h-4 w-4" />
+                            </Link>
+                          </Button>
                         </div>
-                      </div>
-                      </div>
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link to={`/actividad/${subtarea.actividad.id}`}>
-                          <ArrowRight className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </section>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </section>
+            )}
+
+
+          </div>
         )}
       </div>
     </div>

@@ -20,32 +20,10 @@ import {
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
-const TIPOS_ACTIVIDAD = [
-  { value: "tarea", label: "Tarea" },
-  { value: "proyecto", label: "Proyecto" },
-  { value: "examen", label: "Examen" },
-  { value: "quiz", label: "Quiz" },
-  { value: "laboratorio", label: "Laboratorio" },
-  { value: "lectura", label: "Lectura" },
-  { value: "otro", label: "Otro" },
-];
-
-const TIPOS_SUBTAREA = [
-  { value: "investigacion", label: "Investigación" },
-  { value: "redaccion", label: "Redacción" },
-  { value: "programacion", label: "Programación" },
-  { value: "estudio", label: "Estudio" },
-  { value: "revision", label: "Revisión" },
-  { value: "practica", label: "Práctica" },
-  { value: "otro", label: "Otro" },
-];
-
-const initialErrors = {
-  titulo: "",
-  descripcion: "",
-  fecha_entrega: "",
-  subtareas: [],
-};
+import { TIPOS_ACTIVIDAD, TIPOS_SUBTAREA, initialErrors } from "@/lib/constants";
+import { useValidation } from "@/hooks/useValidation";
+import { useOverloadDetection } from "@/hooks/useOverloadDetection";
+import ConflictPanel from "@/components/ConflictPanel";
 
 export default function ActividadPage() {
   const { id } = useParams();
@@ -62,11 +40,19 @@ export default function ActividadPage() {
   const [saving, setSaving] = useState(false);
   const [mensaje, setMensaje] = useState(null);
   const [error, setError] = useState(null);
-  const [errors, setErrors] = useState(initialErrors);
+  const { errors, setErrors, validarFormulario, clearError } = useValidation();
+  const {
+    conflicto,
+    conflictoSubtareaIndex,
+    verificarConflicto,
+    handleConflictAction,
+    verificarTodosConflictos,
+    dismissConflict,
+  } = useOverloadDetection();
 
-  // ── Conflict state ──
-  const [conflicto, setConflicto] = useState(null);
-  const [conflictoSubtareaIndex, setConflictoSubtareaIndex] = useState(null);
+  const handleConflictActionUI = (accion) => {
+    handleConflictAction(accion, subtareas, setSubtareas, setMensaje);
+  };
 
   // ── Progress state (US-10) ──
   const [progreso, setProgreso] = useState(null);
@@ -150,97 +136,7 @@ export default function ActividadPage() {
     }
   };
 
-  // ── Verificar conflicto al cambiar fecha_objetivo o horas de una subtarea ──
-  const verificarConflicto = async (index, nuevaFecha, horasOverride) => {
-    const subtarea = subtareas[index];
-    const horas = horasOverride !== undefined ? parseFloat(horasOverride) : parseFloat(subtarea.horas_estimadas);
-    if (!nuevaFecha || !horas || horas <= 0) return;
 
-    try {
-      const response = await apiFetch("/conflicto/verificar/", {
-        method: "POST",
-        body: JSON.stringify({
-          fecha: nuevaFecha,
-          horas_nuevas: horas,
-          subtarea_id: subtarea.id || undefined,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.hay_conflicto) {
-          setConflicto(data);
-          setConflictoSubtareaIndex(index);
-        } else {
-          // Sin conflicto — limpiar si era de esta subtarea
-          if (conflictoSubtareaIndex === index) {
-            setConflicto(null);
-            setConflictoSubtareaIndex(null);
-          }
-        }
-      }
-    } catch {
-      // Silenciar errores de verificación
-    }
-  };
-
-  const validarFormulario = () => {
-    const nuevosErrores = { ...initialErrors };
-    let esValido = true;
-
-    if (!titulo.trim()) {
-      nuevosErrores.titulo = "El título es requerido";
-      esValido = false;
-    } else if (titulo.trim().length < 3) {
-      nuevosErrores.titulo = "El título debe tener al menos 3 caracteres";
-      esValido = false;
-    }
-
-    if (descripcion.length > 500) {
-      nuevosErrores.descripcion =
-        "La descripción no puede exceder 500 caracteres";
-      esValido = false;
-    }
-
-    if (!fechaEntrega) {
-      nuevosErrores.fecha_entrega = "La fecha de entrega es requerida";
-      esValido = false;
-    }
-
-    const titulosSubtareas = subtareas
-      .map((s) => s.titulo.trim())
-      .filter((t) => t !== "");
-    const duplicados = titulosSubtareas.filter(
-      (t, i) => titulosSubtareas.indexOf(t) !== i,
-    );
-
-    if (duplicados.length > 0) {
-      nuevosErrores.subtareas =
-        "No puede haber subtareas con títulos duplicados";
-      esValido = false;
-    }
-
-    subtareas.forEach((subtarea, index) => {
-      if (!subtarea.titulo || subtarea.titulo.trim() === "") {
-        // Es opcional, la ignoramos al guardar
-        return;
-      }
-      
-      if (!subtarea.fecha_objetivo) {
-        nuevosErrores.subtareas = `La fecha objetivo de la subtarea ${index + 1} es requerida`;
-        esValido = false;
-      } else if (
-        !subtarea.horas_estimadas ||
-        parseFloat(subtarea.horas_estimadas) <= 0
-      ) {
-        nuevosErrores.subtareas = `Las horas estimadas de la subtarea ${index + 1} deben ser mayores a 0`;
-        esValido = false;
-      }
-    });
-
-    setErrors(nuevosErrores);
-    return esValido;
-  };
 
   const agregarSubtarea = () => {
     setSubtareas([
@@ -286,8 +182,7 @@ export default function ActividadPage() {
     setSubtareas(subtareas.filter((_, i) => i !== index));
     setErrors({ ...errors, subtareas: "" });
     if (conflictoSubtareaIndex === index) {
-      setConflicto(null);
-      setConflictoSubtareaIndex(null);
+      dismissConflict();
     }
   };
 
@@ -299,87 +194,17 @@ export default function ActividadPage() {
 
     // Verificar conflicto al cambiar fecha_objetivo o horas_estimadas
     if (campo === "fecha_objetivo" && valor) {
-      verificarConflicto(index, valor);
+      verificarConflicto(index, nuevasSubtareas[index], valor);
     }
     if (campo === "horas_estimadas" && valor) {
       const fecha = nuevasSubtareas[index].fecha_objetivo;
       if (fecha) {
-        verificarConflicto(index, fecha, valor);
+        verificarConflicto(index, nuevasSubtareas[index], fecha, valor);
       }
     }
   };
 
-  // ── Conflict resolution actions ──
-  const handleConflictAction = (accion) => {
-    const idx = conflictoSubtareaIndex;
-    if (idx === null) return;
 
-    switch (accion) {
-      case "mover": {
-        // Clear date so user can pick another
-        const nuevasSubtareas = [...subtareas];
-        nuevasSubtareas[idx].fecha_objetivo = "";
-        setSubtareas(nuevasSubtareas);
-        setConflicto(null);
-        setConflictoSubtareaIndex(null);
-        setMensaje({
-          type: "info",
-          text: "Fecha limpiada — elige un día con menos carga.",
-        });
-        setTimeout(() => setMensaje(null), 3000);
-        break;
-      }
-      case "reducir": {
-        const disponible = conflicto.limite - conflicto.horas_actuales;
-        if (disponible > 0) {
-          const nuevasSubtareas = [...subtareas];
-          nuevasSubtareas[idx].horas_estimadas = disponible.toFixed(1);
-          setSubtareas(nuevasSubtareas);
-          setMensaje({
-            type: "info",
-            text: `Horas ajustadas a ${disponible.toFixed(1)}h para caber en tu día.`,
-          });
-          setTimeout(() => setMensaje(null), 3000);
-        }
-        setConflicto(null);
-        setConflictoSubtareaIndex(null);
-        break;
-      }
-      case "posponer": {
-        const fechaActual = subtareas[idx].fecha_objetivo;
-        if (fechaActual) {
-          const siguiente = new Date(fechaActual + "T00:00:00");
-          siguiente.setDate(siguiente.getDate() + 1);
-          const nuevaFecha = siguiente.toISOString().split("T")[0];
-          const nuevasSubtareas = [...subtareas];
-          nuevasSubtareas[idx].fecha_objetivo = nuevaFecha;
-          setSubtareas(nuevasSubtareas);
-          setConflicto(null);
-          setConflictoSubtareaIndex(null);
-          setMensaje({
-            type: "info",
-            text: `Subtarea movida al ${new Date(nuevaFecha + "T00:00:00").toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "short" })}. Verificando carga...`,
-          });
-          setTimeout(() => setMensaje(null), 3000);
-          // Re-verify in new date
-          verificarConflicto(idx, nuevaFecha);
-        }
-        break;
-      }
-      case "forzar": {
-        setConflicto(null);
-        setConflictoSubtareaIndex(null);
-        setMensaje({
-          type: "info",
-          text: "Conflicto ignorado — recuerda guardar los cambios.",
-        });
-        setTimeout(() => setMensaje(null), 3000);
-        break;
-      }
-      default:
-        break;
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -392,38 +217,15 @@ export default function ActividadPage() {
       return;
     }
 
-    if (!validarFormulario()) {
+    if (!validarFormulario({ titulo, descripcion, fechaEntrega, subtareas })) {
       return;
     }
 
     // Verificar conflictos de todas las subtareas antes de guardar
-    const subtareasValidas = subtareas.filter((s) => s.titulo.trim() !== "");
-    for (const sub of subtareasValidas) {
-      const horas = parseFloat(sub.horas_estimadas);
-      if (!sub.fecha_objetivo || !horas || horas <= 0) continue;
-
-      try {
-        const response = await apiFetch("/conflicto/verificar/", {
-          method: "POST",
-          body: JSON.stringify({
-            fecha: sub.fecha_objetivo,
-            horas_nuevas: horas,
-            subtarea_id: sub.id || undefined,
-          }),
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.hay_conflicto) {
-            const idx = subtareas.indexOf(sub);
-            setConflicto(data);
-            setConflictoSubtareaIndex(idx);
-            setError(`La subtarea "${sub.titulo}" genera sobrecarga el ${sub.fecha_objetivo}. Resuélvelo antes de guardar.`);
-            return;
-          }
-        }
-      } catch {
-        // continue if check fails
-      }
+    const result = await verificarTodosConflictos(subtareas);
+    if (result.hayConflicto) {
+      setError(`La subtarea "${result.subtarea.titulo}" genera sobrecarga el ${result.fecha}. Resuélvelo antes de guardar.`);
+      return;
     }
 
     setSaving(true);
@@ -436,7 +238,7 @@ export default function ActividadPage() {
         fecha_entrega: fechaEntrega,
         completada: completada,
         subtareas: subtareas
-          .filter((s) => s.titulo.trim() !== "")
+          .filter((s) => s.titulo && s.titulo.trim() !== "")
           .map((s) => ({
             id: s.id,
             titulo: s.titulo.trim(),
@@ -561,95 +363,11 @@ export default function ActividadPage() {
         )}
 
         {/* ──────── CONFLICT PANEL ──────── */}
-        {conflicto && (
-          <div
-            className="mb-5 p-5 bg-amber-500/5 border-2 border-amber-500/40 rounded-2xl shadow-sm"
-            role="alert"
-            aria-live="assertive"
-          >
-            <div className="flex items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
-                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-amber-700 dark:text-amber-300 text-base">
-                  ⚡ Ese día ya está bastante cargado
-                </h3>
-                <p className="text-sm text-amber-600/90 dark:text-amber-300/80 mt-1 leading-relaxed">
-                  {conflicto.mensaje}
-                </p>
-
-                {/* Visual capacity bar */}
-                <div className="mt-3 space-y-1.5">
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Carga del día</span>
-                    <span className="font-medium text-amber-700 dark:text-amber-400">
-                      {conflicto.horas_con_nueva}h / {conflicto.limite}h
-                    </span>
-                  </div>
-                  <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-amber-500 transition-all duration-300"
-                      style={{ width: `${Math.min(100, conflicto.porcentaje_uso || 100)}%` }}
-                    />
-                  </div>
-                  <p className="text-[11px] text-muted-foreground/70">
-                    Ya hay {conflicto.horas_actuales}h planificadas + {(conflicto.horas_con_nueva - conflicto.horas_actuales).toFixed(1)}h de esta subtarea
-                  </p>
-                </div>
-
-                {/* Resolution options */}
-                <div className="mt-4 space-y-2.5">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    ¿Qué prefieres hacer?
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {conflicto.alternativas?.map((alt) => (
-                      <button
-                        key={alt.accion}
-                        type="button"
-                        onClick={() => handleConflictAction(alt.accion)}
-                        className={`flex items-start gap-2.5 p-3 rounded-xl border text-left text-sm transition-all duration-150 cursor-pointer group ${
-                          alt.accion === "forzar"
-                            ? "border-destructive/20 hover:border-destructive/40 hover:bg-destructive/5"
-                            : "border-border hover:border-primary/30 hover:bg-accent/50 hover:shadow-sm"
-                        }`}
-                      >
-                        <span className="text-lg leading-none mt-0.5">
-                          {alt.accion === "mover" && "📅"}
-                          {alt.accion === "reducir" && "⏱️"}
-                          {alt.accion === "posponer" && "➡️"}
-                          {alt.accion === "forzar" && "⚠️"}
-                        </span>
-                        <span className="flex-1 min-w-0">
-                          <span className={`block font-medium text-sm ${
-                            alt.accion === "forzar" ? "text-destructive" : ""
-                          }`}>
-                            {alt.titulo || alt.descripcion}
-                          </span>
-                          <span className="block text-xs text-muted-foreground mt-0.5 leading-snug">
-                            {alt.descripcion}
-                          </span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setConflicto(null);
-                  setConflictoSubtareaIndex(null);
-                }}
-                className="text-muted-foreground/50 hover:text-foreground transition-colors p-1 rounded-lg hover:bg-muted"
-                aria-label="Cerrar alerta"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        )}
+        <ConflictPanel
+          conflicto={conflicto}
+          onAction={handleConflictActionUI}
+          onDismiss={dismissConflict}
+        />
 
         <form onSubmit={handleSubmit} noValidate>
           {/* Main activity completion toggle */}
@@ -704,7 +422,7 @@ export default function ActividadPage() {
                   value={titulo}
                   onChange={(e) => {
                     setTitulo(e.target.value);
-                    setErrors({ ...errors, titulo: "" });
+                    clearError("titulo");
                   }}
                   className={errors.titulo ? "border-red-500 mt-1" : "mt-1"}
                 />
@@ -738,7 +456,7 @@ export default function ActividadPage() {
                   value={descripcion}
                   onChange={(e) => {
                     setDescripcion(e.target.value);
-                    setErrors({ ...errors, descripcion: "" });
+                    clearError("descripcion");
                   }}
                   className={
                     errors.descripcion ? "border-red-500 mt-1" : "mt-1"
@@ -762,7 +480,7 @@ export default function ActividadPage() {
                   value={fechaEntrega}
                   onChange={(e) => {
                     setFechaEntrega(e.target.value);
-                    setErrors({ ...errors, fecha_entrega: "" });
+                    clearError("fecha_entrega");
                   }}
                   className={
                     errors.fecha_entrega ? "border-red-500 mt-1" : "mt-1"
