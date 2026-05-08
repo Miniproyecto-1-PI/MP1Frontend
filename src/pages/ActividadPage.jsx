@@ -373,36 +373,45 @@ export default function ActividadPage() {
           {/* Main activity completion toggle */}
           <div className="mb-6">
             <Card 
-              className={`border-2 transition-all duration-300 cursor-pointer ${
+              className={`border-2 transition-all duration-300 cursor-pointer overflow-hidden relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-500 ${
                 completada 
-                  ? "border-emerald-500/50 bg-emerald-500/5" 
-                  : "border-border/50 bg-card hover:border-primary/30"
+                  ? "border-emerald-500 bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.2)]" 
+                  : "border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary shadow-sm hover:shadow-md"
               }`}
               onClick={() => setCompletada(!completada)}
+              role="switch"
+              aria-checked={completada}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setCompletada(!completada);
+                }
+              }}
             >
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${
-                  completada ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"
+              <div className={`absolute left-0 top-0 bottom-0 w-2 transition-colors ${completada ? "bg-emerald-500" : "bg-primary"}`} />
+              <CardContent className="p-5 sm:p-6 flex items-center gap-4 sm:gap-6">
+                <div className={`flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl transition-all duration-300 ${
+                  completada ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-110" : "bg-primary/20 text-primary group-hover:scale-105"
                 }`}>
-                  <CheckCircle className="h-6 w-6" />
+                  <CheckCircle className={`h-6 w-6 sm:h-8 sm:w-8 transition-transform duration-300 ${completada ? "scale-110" : ""}`} />
                 </div>
                 <div className="flex-1">
-                  <h3 className={`font-semibold text-lg transition-colors ${
-                    completada ? "text-emerald-700 dark:text-emerald-400" : ""
+                  <h3 className={`font-bold text-lg sm:text-xl transition-colors ${
+                    completada ? "text-emerald-700 dark:text-emerald-400" : "text-primary"
                   }`}>
-                    {completada ? "¡Actividad completada!" : "Marcar actividad como completada"}
+                    {completada ? "✓ ¡Actividad completada!" : "✓ Marcar como completada"}
                   </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {completada ? "Has finalizado esta actividad. ¡Buen trabajo!" : "Haz clic aquí cuando hayas terminado todo."}
+                  <p className="text-sm sm:text-base font-medium opacity-80 mt-1">
+                    {completada ? "Has finalizado esta actividad. ¡Buen trabajo!" : "Toca aquí cuando hayas terminado todo."}
                   </p>
                 </div>
-                <div>
-                  <input
-                    type="checkbox"
-                    checked={completada}
-                    readOnly
-                    className="h-5 w-5 rounded border-gray-300 text-emerald-500 focus:ring-emerald-500 pointer-events-none"
-                  />
+                <div className="shrink-0 flex items-center justify-center">
+                   <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center transition-all ${
+                     completada ? "border-emerald-500 bg-emerald-500" : "border-primary/50 bg-background"
+                   }`}>
+                     {completada && <CheckCircle className="h-5 w-5 text-white" />}
+                   </div>
                 </div>
               </CardContent>
             </Card>
@@ -474,18 +483,27 @@ export default function ActividadPage() {
 
               <div>
                 <Label htmlFor="fechaEntrega">Fecha de entrega *</Label>
-                <Input
-                  id="fechaEntrega"
-                  type="date"
-                  value={fechaEntrega}
-                  onChange={(e) => {
-                    setFechaEntrega(e.target.value);
-                    clearError("fecha_entrega");
-                  }}
-                  className={
-                    errors.fecha_entrega ? "border-red-500 mt-1" : "mt-1"
-                  }
-                />
+                <div className="relative group mt-1 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-1 rounded-md">
+                  <div className={`flex items-center gap-2 h-10 px-3 bg-primary/5 hover:bg-primary/15 active:scale-[0.98] border rounded-md transition-all cursor-pointer ${errors.fecha_entrega ? "border-red-500" : "border-primary/20 hover:border-primary/40"}`}>
+                    <div className="bg-primary/20 p-1.5 rounded-md text-primary">
+                      <CalendarIcon className="h-4 w-4" />
+                    </div>
+                    <span className="text-sm font-medium text-foreground flex-1">
+                      {fechaEntrega ? new Date(fechaEntrega + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha"}
+                    </span>
+                  </div>
+                  <Input
+                    id="fechaEntrega"
+                    type="date"
+                    value={fechaEntrega}
+                    onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
+                    onChange={(e) => {
+                      setFechaEntrega(e.target.value);
+                      clearError("fecha_entrega");
+                    }}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                </div>
                 {errors.fecha_entrega && (
                   <p className="text-red-500 text-sm mt-1">
                     {errors.fecha_entrega}
@@ -595,18 +613,30 @@ export default function ActividadPage() {
                     </div>
                     <div className="w-36 space-y-1">
                       <Label className="text-xs">Fecha objetivo</Label>
-                      <Input
-                        type="date"
-                        value={subtarea.fecha_objetivo || ""}
-                        onChange={(e) =>
-                          actualizarSubtarea(
-                            index,
-                            "fecha_objetivo",
-                            e.target.value,
-                          )
-                        }
-                        title="¿Cuándo planeas trabajar en esto?"
-                      />
+                      <div className="relative group min-w-[144px] focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-1 rounded-md">
+                        <div className="flex items-center gap-2 h-9 px-2.5 bg-primary/5 hover:bg-primary/15 active:scale-[0.98] border border-primary/20 hover:border-primary/40 rounded-md transition-all cursor-pointer">
+                          <div className="bg-primary/20 p-1 rounded-md text-primary">
+                            <CalendarIcon className="h-3.5 w-3.5" />
+                          </div>
+                          <span className="text-sm font-medium text-foreground truncate flex-1">
+                            {subtarea.fecha_objetivo ? new Date(subtarea.fecha_objetivo + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "Fecha"}
+                          </span>
+                        </div>
+                        <Input
+                          type="date"
+                          value={subtarea.fecha_objetivo || ""}
+                          onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
+                          onChange={(e) =>
+                            actualizarSubtarea(
+                              index,
+                              "fecha_objetivo",
+                              e.target.value,
+                            )
+                          }
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          title="Toca para elegir fecha"
+                        />
+                      </div>
                     </div>
                     <div className="w-20 space-y-1">
                       <Label className="text-xs">Horas</Label>

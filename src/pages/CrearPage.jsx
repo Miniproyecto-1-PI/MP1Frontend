@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   X,
   Trash2,
+  CalendarIcon,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
@@ -266,18 +267,27 @@ export default function CrearPage() {
 
               <div>
                 <Label htmlFor="fechaEntrega">Fecha de entrega *</Label>
-                <Input
-                  id="fechaEntrega"
-                  type="date"
-                  value={fechaEntrega}
-                  onChange={(e) => {
-                    setFechaEntrega(e.target.value);
-                    clearError("fecha_entrega");
-                  }}
-                  className={
-                    errors.fecha_entrega ? "border-red-500 mt-1" : "mt-1"
-                  }
-                />
+                <div className="relative group mt-1 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-1 rounded-md">
+                  <div className={`flex items-center gap-2 h-10 px-3 bg-primary/5 hover:bg-primary/15 active:scale-[0.98] border rounded-md transition-all cursor-pointer ${errors.fecha_entrega ? "border-red-500" : "border-primary/20 hover:border-primary/40"}`}>
+                    <div className="bg-primary/20 p-1.5 rounded-md text-primary">
+                      <CalendarIcon className="h-4 w-4" />
+                    </div>
+                    <span className="text-sm font-medium text-foreground flex-1">
+                      {fechaEntrega ? new Date(fechaEntrega + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha"}
+                    </span>
+                  </div>
+                  <Input
+                    id="fechaEntrega"
+                    type="date"
+                    value={fechaEntrega}
+                    onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
+                    onChange={(e) => {
+                      setFechaEntrega(e.target.value);
+                      clearError("fecha_entrega");
+                    }}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                </div>
                 {errors.fecha_entrega && (
                   <p className="text-red-500 text-sm mt-1">
                     {errors.fecha_entrega}
@@ -350,18 +360,30 @@ export default function CrearPage() {
                     </div>
                     <div className="w-36 space-y-1">
                       <Label className="text-xs">Fecha objetivo</Label>
-                      <Input
-                        type="date"
-                        value={subtarea.fecha_objetivo || ""}
-                        onChange={(e) =>
-                          actualizarSubtarea(
-                            index,
-                            "fecha_objetivo",
-                            e.target.value,
-                          )
-                        }
-                        title="¿Cuándo planeas trabajar en esto?"
-                      />
+                      <div className="relative group min-w-[144px] focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-1 rounded-md">
+                        <div className="flex items-center gap-2 h-9 px-2.5 bg-primary/5 hover:bg-primary/15 active:scale-[0.98] border border-primary/20 hover:border-primary/40 rounded-md transition-all cursor-pointer">
+                          <div className="bg-primary/20 p-1 rounded-md text-primary">
+                            <CalendarIcon className="h-3.5 w-3.5" />
+                          </div>
+                          <span className="text-sm font-medium text-foreground truncate flex-1">
+                            {subtarea.fecha_objetivo ? new Date(subtarea.fecha_objetivo + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "Fecha"}
+                          </span>
+                        </div>
+                        <Input
+                          type="date"
+                          value={subtarea.fecha_objetivo || ""}
+                          onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
+                          onChange={(e) =>
+                            actualizarSubtarea(
+                              index,
+                              "fecha_objetivo",
+                              e.target.value,
+                            )
+                          }
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          title="Toca para elegir fecha"
+                        />
+                      </div>
                     </div>
                     <div className="w-24 space-y-1">
                       <Label className="text-xs">Horas</Label>

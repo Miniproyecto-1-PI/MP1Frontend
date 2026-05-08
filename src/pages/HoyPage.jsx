@@ -338,40 +338,44 @@ export default function HoyPage() {
                   {data.actividades_hoy.map((actividad) => (
                     <Card
                       key={`a-${actividad.id}`}
-                      className="border-primary/20 hover:shadow-md transition-shadow bg-primary/5"
+                      className="relative overflow-hidden border-border hover:shadow-lg transition-all bg-card group"
                     >
-                      <CardContent className="py-3 px-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              {actividad.completada && (
-                                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white mr-1">
-                                  <CheckCircle className="h-3 w-3" />
-                                </div>
-                              )}
-                              <span className={`font-medium truncate ${actividad.completada ? "line-through text-muted-foreground" : ""}`}>
-                                {actividad.titulo}
-                              </span>
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary-foreground border">
-                                Actividad
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                              <span className="text-primary font-medium">Se entrega hoy</span>
-                              {(!actividad.subtareas || actividad.subtareas.length === 0) && (
-                                <>
-                                  <span>·</span>
-                                  <span className="text-amber-600 font-medium">Sin subtareas planificadas</span>
-                                </>
-                              )}
-                            </div>
+                      <div className={`absolute top-0 left-0 w-1.5 h-full ${actividad.completada ? 'bg-emerald-500' : 'bg-primary'}`} />
+                      <CardContent className="py-3.5 px-4 sm:p-5 flex items-center justify-between gap-4 ml-1.5">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                              actividad.completada 
+                                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" 
+                                : "bg-primary/10 text-primary border border-primary/20"
+                            }`}>
+                              {actividad.completada ? "Completada" : "Urgente: Hoy"}
+                            </span>
                           </div>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link to={`/actividad/${actividad.id}`}>
-                              <ArrowRight className="h-4 w-4" />
-                            </Link>
-                          </Button>
+                          <h3 className={`text-base font-bold truncate transition-colors group-hover:text-primary ${
+                            actividad.completada ? "line-through text-muted-foreground opacity-70" : "text-foreground"
+                          }`}>
+                            {actividad.titulo}
+                          </h3>
+                          <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground font-medium">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3.5 w-3.5 text-primary" /> Entrega Hoy
+                            </span>
+                            {(!actividad.subtareas || actividad.subtareas.length === 0) && (
+                              <span className="flex items-center gap-1 text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md">
+                                <AlertTriangle className="h-3 w-3" /> Sin subtareas
+                              </span>
+                            )}
+                          </div>
                         </div>
+                        <Button className={`shrink-0 h-9 w-9 sm:w-auto sm:px-4 rounded-full sm:rounded-lg shadow-sm transition-transform active:scale-95 ${
+                          actividad.completada ? "bg-emerald-500 hover:bg-emerald-600" : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                        }`} asChild>
+                          <Link to={`/actividad/${actividad.id}`}>
+                            <span className="hidden sm:inline font-semibold mr-1">Gestionar</span>
+                            <ArrowRight className="h-4 w-4" />
+                          </Link>
+                        </Button>
                       </CardContent>
                     </Card>
                   ))}
